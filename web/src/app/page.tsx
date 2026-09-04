@@ -8,10 +8,10 @@ export default function Home() {
           </p>
           <div className="flex flex-col gap-3">
             <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-              Describe the conflict.
+              Start with how you see it.
             </h1>
             <p className="max-w-2xl text-base leading-7 text-stone-600">
-              Your perspective will become the beginning of a shared case.
+              Write what you would like the other person to understand.
             </p>
           </div>
         </div>
@@ -19,14 +19,15 @@ export default function Home() {
         <form className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">
             <label
-              htmlFor="conflict-description"
+              htmlFor="how-i-see-it"
               className="text-sm font-medium text-stone-700"
             >
-              What happened?
+              How I see it
             </label>
             <textarea
-              id="conflict-description"
-              name="conflict-description"
+              id="how-i-see-it"
+              name="how-i-see-it"
+              required
               rows={8}
               className="w-full resize-y rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-base leading-7 text-stone-900 outline-none transition focus:border-stone-500 focus:bg-white focus:ring-4 focus:ring-stone-200"
             />
@@ -37,7 +38,7 @@ export default function Home() {
               type="button"
               className="inline-flex items-center justify-center rounded-full bg-stone-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-stone-700 focus:outline-none focus:ring-4 focus:ring-stone-300"
             >
-              Create case
+              Prepare invitation
             </button>
           </div>
         </form>
