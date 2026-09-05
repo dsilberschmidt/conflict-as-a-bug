@@ -1,19 +1,41 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { decryptInvitation, encryptInvitation } from "./crypto.ts";
+import {
+  addInviteePerspective,
+  createInitialInvitation,
+  decryptInvitation,
+  encryptInvitation,
+} from "./crypto.ts";
 
 test("round trips a multiline Unicode perspective", async () => {
   const perspective = "Primera linea\n第二行\n🪴 Cacti are resilient";
-  const { envelope, decryptionKey } = await encryptInvitation({ perspective });
+  const invitation = createInitialInvitation(perspective);
+  const { envelope, decryptionKey } = await encryptInvitation(invitation);
 
-  assert.deepEqual(await decryptInvitation(envelope, decryptionKey), { perspective });
+  assert.deepEqual(await decryptInvitation(envelope, decryptionKey), invitation);
   assert.deepEqual(Object.keys(envelope).sort(), ["algorithm", "ciphertext", "iv", "version"]);
   assert.equal(Object.hasOwn(envelope, "key"), false);
 });
 
+test("creates and updates invitation state", () => {
+  const initial = createInitialInvitation("A's perspective");
+  const updated = addInviteePerspective(initial, "B's perspective");
+
+  assert.equal(initial.schemaVersion, "v1");
+  assert.match(initial.caseId, /^[A-Za-z0-9_-]+$/);
+  assert.equal(initial.revision, 1);
+  assert.deepEqual(initial.perspectives, { inviter: "A's perspective" });
+  assert.equal(updated.caseId, initial.caseId);
+  assert.equal(updated.revision, 2);
+  assert.deepEqual(updated.perspectives, {
+    inviter: "A's perspective",
+    invitee: "B's perspective",
+  });
+});
+
 test("uses different ciphertext for repeated encryption", async () => {
-  const invitation = { perspective: "The same invitation, encrypted twice." };
+  const invitation = createInitialInvitation("The same invitation, encrypted twice.");
   const first = await encryptInvitation(invitation);
   const second = await encryptInvitation(invitation);
 
@@ -23,14 +45,14 @@ test("uses different ciphertext for repeated encryption", async () => {
 });
 
 test("rejects an envelope with an incorrect key", async () => {
-  const { envelope } = await encryptInvitation({ perspective: "Private perspective" });
-  const other = await encryptInvitation({ perspective: "Different key" });
+  const { envelope } = await encryptInvitation(createInitialInvitation("Private perspective"));
+  const other = await encryptInvitation(createInitialInvitation("Different key"));
 
   await assert.rejects(decryptInvitation(envelope, other.decryptionKey));
 });
 
 test("rejects a tampered ciphertext", async () => {
-  const { envelope, decryptionKey } = await encryptInvitation({ perspective: "Integrity matters" });
+  const { envelope, decryptionKey } = await encryptInvitation(createInitialInvitation("Integrity matters"));
   const lastCharacter = envelope.ciphertext.at(-1);
   const replacement = lastCharacter === "A" ? "B" : "A";
 
@@ -43,7 +65,7 @@ test("rejects a tampered ciphertext", async () => {
 });
 
 test("rejects malformed envelopes with controlled errors", async () => {
-  const { envelope, decryptionKey } = await encryptInvitation({ perspective: "Validation matters" });
+  const { envelope, decryptionKey } = await encryptInvitation(createInitialInvitation("Validation matters"));
 
   await assert.rejects(decryptInvitation(null, decryptionKey), /Invalid invitation encryption envelope/);
   await assert.rejects(

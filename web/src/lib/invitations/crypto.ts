@@ -1,12 +1,21 @@
 /** Browser-native encryption for invitation payloads. */
 
 export const INVITATION_ENCRYPTION_VERSION = "v1" as const;
+export const INVITATION_SCHEMA_VERSION = "v1" as const;
 const INVITATION_ENCRYPTION_ALGORITHM = "AES-256-GCM" as const;
 const KEY_LENGTH_BYTES = 32;
 const IV_LENGTH_BYTES = 12;
+const CASE_ID_LENGTH_BYTES = 16;
+const INITIAL_REVISION = 1;
 
 export interface Invitation {
-  perspective: string;
+  schemaVersion: typeof INVITATION_SCHEMA_VERSION;
+  caseId: string;
+  revision: number;
+  perspectives: {
+    inviter: string;
+    invitee?: string;
+  };
 }
 
 export interface EncryptedInvitationEnvelope {
@@ -63,17 +72,95 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return buffer;
 }
 
-function isInvitation(value: unknown): value is Invitation {
-  if (typeof value !== "object" || value === null) {
+function hasExpectedFields(value: Record<string, unknown>, expectedFields: string[]): boolean {
+  const fields = Reflect.ownKeys(value);
+
+  return (
+    fields.length === expectedFields.length &&
+    fields.every((field) => typeof field === "string" && expectedFields.includes(field))
+  );
+}
+
+function isCaseId(value: unknown): value is string {
+  if (typeof value !== "string") {
     return false;
   }
 
-  const candidate = value as Record<string, unknown>;
-  return Object.hasOwn(candidate, "perspective") && typeof candidate.perspective === "string";
+  try {
+    return decodeBase64Url(value).byteLength === CASE_ID_LENGTH_BYTES;
+  } catch {
+    return false;
+  }
+}
+
+function isInvitation(value: unknown): value is Invitation {
+  if (!isRecord(value) || !hasExpectedFields(value, ["schemaVersion", "caseId", "revision", "perspectives"])) {
+    return false;
+  }
+
+  if (
+    value.schemaVersion !== INVITATION_SCHEMA_VERSION ||
+    !isCaseId(value.caseId) ||
+    typeof value.revision !== "number" ||
+    !Number.isInteger(value.revision) ||
+    value.revision < INITIAL_REVISION ||
+    !isRecord(value.perspectives) ||
+    !hasExpectedFields(
+      value.perspectives,
+      Object.hasOwn(value.perspectives, "invitee") ? ["inviter", "invitee"] : ["inviter"],
+    ) ||
+    typeof value.perspectives.inviter !== "string" ||
+    (Object.hasOwn(value.perspectives, "invitee") && typeof value.perspectives.invitee !== "string")
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Creates the first encrypted-state payload for an invitation. */
+export function createInitialInvitation(perspective: string): Invitation {
+  if (typeof perspective !== "string") {
+    throw new TypeError("Inviter perspective must be a string");
+  }
+
+  const caseId = encodeBase64Url(
+    getWebCrypto().getRandomValues(new Uint8Array(CASE_ID_LENGTH_BYTES)),
+  );
+
+  return {
+    schemaVersion: INVITATION_SCHEMA_VERSION,
+    caseId,
+    revision: INITIAL_REVISION,
+    perspectives: { inviter: perspective },
+  };
+}
+
+/** Adds B's perspective while preserving the case and advancing its revision. */
+export function addInviteePerspective(
+  invitation: Invitation,
+  perspective: string,
+): Invitation {
+  if (!isInvitation(invitation) || typeof perspective !== "string") {
+    throw new TypeError("Invalid invitation state");
+  }
+
+  if (invitation.revision === Number.MAX_SAFE_INTEGER) {
+    throw new Error("Invitation revision cannot be incremented");
+  }
+
+  return {
+    ...invitation,
+    revision: invitation.revision + 1,
+    perspectives: {
+      ...invitation.perspectives,
+      invitee: perspective,
+    },
+  };
 }
 
 function assertEnvelope(envelope: unknown): asserts envelope is EncryptedInvitationEnvelope {
@@ -113,8 +200,8 @@ function assertEnvelope(envelope: unknown): asserts envelope is EncryptedInvitat
 export async function encryptInvitation(
   invitation: Invitation,
 ): Promise<EncryptedInvitation> {
-  if (typeof invitation?.perspective !== "string") {
-    throw new TypeError("Invitation perspective must be a string");
+  if (!isInvitation(invitation)) {
+    throw new TypeError("Invalid invitation state");
   }
 
   const webCrypto = getWebCrypto();
@@ -183,5 +270,5 @@ export async function decryptInvitation(
     throw new Error("Invalid decrypted invitation");
   }
 
-  return { perspective: invitation.perspective };
+  return invitation;
 }

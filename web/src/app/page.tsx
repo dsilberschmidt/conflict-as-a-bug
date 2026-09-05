@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 
-import { encryptInvitation } from "../lib/invitations/crypto";
+import { createInitialInvitation, encryptInvitation } from "../lib/invitations/crypto";
 import { createInvitationLink } from "../lib/invitations/link";
 
 export default function Home() {
@@ -30,7 +30,7 @@ export default function Home() {
     setIsCreating(true);
 
     try {
-      const invitation = await encryptInvitation({ perspective });
+      const invitation = await encryptInvitation(createInitialInvitation(perspective));
       setInvitationLink(createInvitationLink(window.location.origin, invitation));
       setCanShare(typeof navigator.share === "function");
     } catch {

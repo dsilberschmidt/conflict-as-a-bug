@@ -1,22 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { decryptInvitation, encryptInvitation } from "./crypto.ts";
+import { createInitialInvitation, decryptInvitation, encryptInvitation } from "./crypto.ts";
 import { createInvitationLink, parseInvitationLink } from "./link.ts";
 
 const baseUrl = "https://example.test/application";
 
 test("round trips an encrypted invitation through a portable link", async () => {
   const perspective = "A multiline perspective\ncon Unicode: こんにちは";
-  const invitation = await encryptInvitation({ perspective });
+  const state = createInitialInvitation(perspective);
+  const invitation = await encryptInvitation(state);
   const link = createInvitationLink(baseUrl, invitation);
   const parsed = parseInvitationLink(link);
 
-  assert.deepEqual(await decryptInvitation(parsed.envelope, parsed.decryptionKey), { perspective });
+  assert.deepEqual(await decryptInvitation(parsed.envelope, parsed.decryptionKey), state);
 });
 
 test("places the key only in the URL fragment", async () => {
-  const invitation = await encryptInvitation({ perspective: "Private perspective" });
+  const invitation = await encryptInvitation(createInitialInvitation("Private perspective"));
   const link = createInvitationLink(baseUrl, invitation);
   const url = new URL(link);
 
@@ -25,14 +26,14 @@ test("places the key only in the URL fragment", async () => {
 });
 
 test("uses exactly the /invite path", async () => {
-  const invitation = await encryptInvitation({ perspective: "Path check" });
+  const invitation = await encryptInvitation(createInitialInvitation("Path check"));
   const url = new URL(createInvitationLink(baseUrl, invitation));
 
   assert.equal(url.pathname, "/invite");
 });
 
 test("rejects invalid invitation link structure", async () => {
-  const invitation = await encryptInvitation({ perspective: "Validation check" });
+  const invitation = await encryptInvitation(createInitialInvitation("Validation check"));
   const link = createInvitationLink(baseUrl, invitation);
 
   const missing = new URL(link);

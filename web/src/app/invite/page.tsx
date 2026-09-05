@@ -22,7 +22,7 @@ export default function InvitationPage() {
         const decrypted = await decryptInvitation(parsed.envelope, parsed.decryptionKey);
 
         if (isCurrent) {
-          setInvitation({ status: "ready", perspective: decrypted.perspective });
+          setInvitation({ status: "ready", perspective: decrypted.perspectives.inviter });
         }
       } catch {
         if (isCurrent) {
