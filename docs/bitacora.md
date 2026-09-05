@@ -12,6 +12,7 @@
 - **Separación en el enlace:** el sobre cifrado viaja en la query y la clave solamente en el fragmento.
 - **Verificación:** las pruebas de crypto y enlaces, `lint` y build pasaron.
 - **Calendario:** `docs/roadmap.md` queda definido como calendario hacia la submission; el estado técnico vigente pertenece a `docs/context.md`, `docs/bitacora.md` y la documentación específica.
+- **5 de septiembre de 2026 — arquitectura privada:** se acuerdan cápsulas cifradas autocontenidas y asincrónicas; el servidor no almacena el caso, `caseId` y `revision` mantienen continuidad, y cualquier versión semipública o pública requiere consentimiento explícito. Blockchain registra consentimiento, hash, fecha y estado, mientras el historial privado permanece fuera de la cadena.
 
 ## Decisiones de producto y arquitectura
 

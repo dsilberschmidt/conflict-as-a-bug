@@ -16,13 +16,19 @@ El alcance actual es un solo caso privado entre A y B. A escribe `How I see it` 
 
 La comprensión confirmada es el requisito previo a los pedidos posteriores. Es una decisión de producto central y no equivale a acuerdo.
 
+## Arquitectura privada acordada
+
+La fase privada usa cápsulas cifradas autocontenidas. El servidor de la aplicación no almacena el caso: cada turno transporta el estado completo mediante el canal elegido, por lo que el intercambio es asincrónico. `caseId` y `revision` mantienen la continuidad entre turnos.
+
+Una versión redactada puede pasar a semipública o pública solamente con consentimiento explícito. Blockchain registra el consentimiento, el hash, la fecha y el estado; el historial privado permanece fuera de la cadena.
+
 ## Implementación actual
 
 La interfaz está implementada con Next.js en `web/src/app/page.tsx`. Hoy permite redactar, revisar y volver a editar una perspectiva; el botón `Create invitation` todavía no conecta el flujo con persistencia ni enlace.
 
 `web/src/lib/invitations/crypto.ts` implementa cifrado local, independiente de React y Next.js, mediante la Web Crypto API y AES-256-GCM. Cada invitación recibe una clave aleatoria de 256 bits y cada cifrado un IV aleatorio de 96 bits. El sobre versionado conserva solo `version`, `algorithm`, `iv` y `ciphertext`, codificados como base64url.
 
-El sobre es el único artefacto apto para almacenar. La `decryptionKey` se devuelve por separado y debe circular por un canal distinto. La decisión concreta sobre almacenamiento y distribución del enlace está pendiente.
+El sobre es el único artefacto apto para almacenar. La `decryptionKey` se devuelve por separado y debe circular por un canal distinto. El almacenamiento cifrado opcional sigue pendiente y no altera la arquitectura privada acordada.
 
 ## Límite actual
 
