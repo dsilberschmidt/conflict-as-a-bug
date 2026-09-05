@@ -13,6 +13,10 @@
 - **Verificación:** las pruebas de crypto y enlaces, `lint` y build pasaron.
 - **Calendario:** `docs/roadmap.md` queda definido como calendario hacia la submission; el estado técnico vigente pertenece a `docs/context.md`, `docs/bitacora.md` y la documentación específica.
 - **5 de septiembre de 2026 — arquitectura privada:** se acuerdan cápsulas cifradas autocontenidas y asincrónicas; el servidor no almacena el caso, `caseId` y `revision` mantienen continuidad, y cualquier versión semipública o pública requiere consentimiento explícito. Blockchain registra consentimiento, hash, fecha y estado, mientras el historial privado permanece fuera de la cadena.
+- **5 de septiembre de 2026 — pantalla receptora `/invite`:** `web/src/app/invite/page.tsx` implementa la ruta estática `/invite`: descifra la cápsula desde la URL, presenta la perspectiva de A y confirma que la clave viaja solo en el fragmento.
+- **5 de septiembre de 2026 — estado versionado del caso privado:** `crypto.ts` establece el tipo `Invitation` con cinco campos: `schemaVersion`, `caseId`, `revision`, `perspectives` (`inviter: string`, `invitee?: string`) y `paraphrases` (`inviter?: Paraphrase`, `invitee?: Paraphrase`); añade el tipo unión `Participant` (`"inviter" | "invitee"`) y la interfaz `Paraphrase` (`text`, `status`, `clarification?`). `test:crypto` asciende a 7/7.
+- **5 de septiembre de 2026 — flujo de respuesta de la persona invitada:** `/invite` permite que B escriba su perspectiva, genere la cápsula de respuesta cifrada y obtenga el enlace para devolver a A.
+- **5 de septiembre de 2026 — paráfrasis mutua:** el flujo end-to-end queda implementado y verificado — A y B se parafrasean, confirman o aclaran, y la comprensión mutua confirmada cierra el ciclo.
 
 ## Decisiones de producto y arquitectura
 
@@ -26,11 +30,9 @@
 
 ## Estado actual verificado
 
-- La interfaz muestra los pasos de redacción y revisión, pero `Create invitation` aún no crea ni comparte una invitación.
-- El módulo de cifrado exporta creación y descifrado de invitaciones con una perspectiva.
-- `test:crypto` pasó con 5 pruebas, incluidas recorrido Unicode, aleatoriedad, clave incorrecta, manipulación y sobres malformados.
-- `lint` pasó sin warnings y el build de producción pasó.
-- El warning de Node sobre module type es informativo y no afecta la aplicación.
+- El flujo end-to-end está implementado: redactar → generar enlace → `/invite` (leer perspectiva de A, escribir perspectiva de B, generar enlace de respuesta) → parafrasear → confirmar comprensión mutua.
+- `npm run lint` pasa sin warnings; `npm run test:crypto` pasa 7/7; `npm run build` compila `/` e `/invite` como rutas estáticas.
+- `src/lib/invitations/link.test.mjs` existe y pasa 4/4 con `node --test` pero no está enganchado a ningún script de `package.json`; convendría agregar `test:link` o unificar ambas suites en un único script.
 
 ## Próximas entradas
 
