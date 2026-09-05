@@ -2,9 +2,17 @@
 
 import { FormEvent, useState } from "react";
 
+import { encryptInvitation } from "../lib/invitations/crypto";
+import { createInvitationLink } from "../lib/invitations/link";
+
 export default function Home() {
   const [step, setStep] = useState<"compose" | "review">("compose");
   const [perspective, setPerspective] = useState("");
+  const [invitationLink, setInvitationLink] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const [canShare, setCanShare] = useState(false);
+  const [error, setError] = useState("");
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -14,6 +22,55 @@ export default function Home() {
     }
 
     setStep("review");
+  }
+
+  async function handleCreateInvitation() {
+    setError("");
+    setIsCopied(false);
+    setIsCreating(true);
+
+    try {
+      const invitation = await encryptInvitation({ perspective });
+      setInvitationLink(createInvitationLink(window.location.origin, invitation));
+      setCanShare(typeof navigator.share === "function");
+    } catch {
+      setError("We couldn't prepare your invitation. Please try again.");
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
+  async function handleCopyLink() {
+    if (!invitationLink) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(invitationLink);
+      setIsCopied(true);
+    } catch {
+      setError("We couldn't copy the link. Please copy it manually.");
+    }
+  }
+
+  async function handleShareLink() {
+    if (!invitationLink || typeof navigator.share !== "function") {
+      return;
+    }
+
+    try {
+      await navigator.share({
+        title: "Conflict as a Bug",
+        text: "An invitation to understand a perspective.",
+        url: invitationLink,
+      });
+    } catch (shareError) {
+      if (shareError instanceof DOMException && shareError.name === "AbortError") {
+        return;
+      }
+
+      setError("We couldn't share the link. Please copy it instead.");
+    }
   }
 
   return (
@@ -93,11 +150,57 @@ export default function Home() {
               </button>
               <button
                 type="button"
+                onClick={handleCreateInvitation}
+                disabled={isCreating}
                 className="inline-flex items-center justify-center rounded-full bg-stone-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-stone-700 focus:outline-none focus:ring-4 focus:ring-stone-300"
               >
-                Create invitation
+                {isCreating ? "Creating invitation…" : "Create invitation"}
               </button>
             </div>
+
+            {error ? (
+              <p role="alert" className="text-sm leading-6 text-stone-600">
+                {error}
+              </p>
+            ) : null}
+
+            {invitationLink ? (
+              <section
+                aria-live="polite"
+                className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4"
+              >
+                <div>
+                  <h2 className="text-sm font-medium text-stone-700">Invitation ready</h2>
+                  <p className="mt-1 text-sm leading-6 text-stone-600">
+                    Share this link with the other person.
+                  </p>
+                </div>
+                <a
+                  href={invitationLink}
+                  className="break-all text-sm leading-6 text-stone-800 underline decoration-stone-300 underline-offset-4"
+                >
+                  {invitationLink}
+                </a>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    className="inline-flex items-center justify-center rounded-full border border-stone-300 bg-white px-5 py-3 text-sm font-medium text-stone-800 transition hover:bg-stone-100 focus:outline-none focus:ring-4 focus:ring-stone-200"
+                  >
+                    {isCopied ? "Copied" : "Copy link"}
+                  </button>
+                  {canShare ? (
+                    <button
+                      type="button"
+                      onClick={handleShareLink}
+                      className="inline-flex items-center justify-center rounded-full border border-stone-300 bg-white px-5 py-3 text-sm font-medium text-stone-800 transition hover:bg-stone-100 focus:outline-none focus:ring-4 focus:ring-stone-200"
+                    >
+                      Share
+                    </button>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
           </div>
         )}
       </div>
