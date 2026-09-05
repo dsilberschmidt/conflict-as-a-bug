@@ -2,11 +2,15 @@
 
 ## Hito actual
 
-v0.1 cuenta con una interfaz inicial para A y un módulo local de cifrado de invitaciones. La creación, el almacenamiento y el intercambio de invitaciones están **pendientes** de integración.
+v0.1 cuenta con una interfaz inicial para A, cifrado local de invitaciones y un enlace portable. El cifrado usa un sobre separado de la `decryptionKey`; no hay persistencia ni backend.
+
+El formato actual es `/invite?v=…&a=…&iv=…&c=…#k=…`. El sobre viaja en la query y la clave solamente en el fragmento de la URL.
 
 ## Próximo paso
 
-Conectar `Create invitation` con el cifrado, el almacenamiento del sobre y la creación de un enlace para B. La `decryptionKey` irá en el fragmento de la URL, de modo que el almacenamiento reciba solo el sobre cifrado. El formato exacto del enlace, el destino del almacenamiento y sus políticas de retención están **pendientes**.
+Conectar `Create invitation` con el cifrado, generar y mostrar el enlace para compartir, y crear la pantalla receptora `/invite` para B. La integración de la interfaz y la pantalla receptora están **pendientes**.
+
+El almacenamiento futuro podrá reemplazar el sobre de la URL por un identificador y mantener la `decryptionKey` en el fragmento. El modelo de almacenamiento, el identificador, la retención y sus políticas de privacidad están **pendientes**.
 
 ## Después
 
@@ -18,4 +22,4 @@ Conectar `Create invitation` con el cifrado, el almacenamiento del sobre y la cr
 
 - Casos semipúblicos, con alcance y privacidad **pendientes** de definición.
 - Solvers humanos o IA, con rol, consentimiento y límites **pendientes**.
-- Blockchain para consentimiento y procedencia, con utilidad, modelo de datos y garantías **pendientes**.
+- Blockchain para consentimiento y procedencia, posterior a un flujo privado completo y demostrable; su utilidad, modelo de datos y garantías están **pendientes**.
