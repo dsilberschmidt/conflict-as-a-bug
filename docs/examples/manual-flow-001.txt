@@ -1,0 +1,27 @@
+A me molesta la musica
+
+B soy baterista,  tengo que ensayar
+
+A es musico tiene que ensayar
+
+durante la siesta no podrías parar?
+
+me pregunta si podría no ensayar en horario de siesta
+
+
+
+A · Perspective
+me molesta la musica
+
+B · What I understood about A
+a mi vecino le molesta cuando ensayo
+
+B · Perspective
+soy baterista,  tengo que ensayar
+
+A · What I understood about B
+me pregunta si podría no ensayar en horario de siesta
+
+Mutual understanding confirmed
+
+

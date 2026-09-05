@@ -6,6 +6,9 @@ import {
   createInitialInvitation,
   decryptInvitation,
   encryptInvitation,
+  isMutualUnderstandingConfirmed,
+  reviewParaphrase,
+  submitParaphrase,
 } from "./crypto.ts";
 
 test("round trips a multiline Unicode perspective", async () => {
@@ -26,12 +29,53 @@ test("creates and updates invitation state", () => {
   assert.match(initial.caseId, /^[A-Za-z0-9_-]+$/);
   assert.equal(initial.revision, 1);
   assert.deepEqual(initial.perspectives, { inviter: "A's perspective" });
+  assert.deepEqual(initial.paraphrases, {});
   assert.equal(updated.caseId, initial.caseId);
   assert.equal(updated.revision, 2);
   assert.deepEqual(updated.perspectives, {
     inviter: "A's perspective",
     invitee: "B's perspective",
   });
+});
+
+test("requires accepted paraphrases in the agreed order", () => {
+  const withInvitee = addInviteePerspective(
+    createInitialInvitation("I felt dismissed when the plan changed."),
+    "I was trying to solve an urgent problem, not dismiss you.",
+  );
+  const firstDraft = submitParaphrase(
+    withInvitee,
+    "inviter",
+    "I understand that you felt urgency and wanted to solve the problem quickly.",
+  );
+  const clarification = reviewParaphrase(
+    firstDraft,
+    "invitee",
+    false,
+    "Please include that I also wanted to keep everyone informed.",
+  );
+  const revised = submitParaphrase(
+    clarification,
+    "inviter",
+    "I understand that you felt urgency, wanted to keep everyone informed, and tried to solve the problem quickly.",
+  );
+  const acceptedAndSecondDraft = submitParaphrase(
+    reviewParaphrase(revised, "invitee", true),
+    "invitee",
+    "I understand that the plan changing without a conversation made you feel dismissed.",
+  );
+  const confirmed = reviewParaphrase(acceptedAndSecondDraft, "inviter", true);
+
+  assert.equal(clarification.paraphrases.inviter?.status, "clarificationRequested");
+  assert.equal(acceptedAndSecondDraft.paraphrases.inviter?.status, "accepted");
+  assert.equal(confirmed.paraphrases.invitee?.status, "accepted");
+  assert.equal(confirmed.caseId, withInvitee.caseId);
+  assert.equal(confirmed.revision, 8);
+  assert.equal(isMutualUnderstandingConfirmed(confirmed), true);
+  assert.throws(
+    () => submitParaphrase(withInvitee, "invitee", "This turn is too early."),
+    /Invalid paraphrase transition/,
+  );
 });
 
 test("uses different ciphertext for repeated encryption", async () => {

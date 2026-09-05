@@ -1,14 +1,27 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createInitialInvitation, decryptInvitation, encryptInvitation } from "./crypto.ts";
+import {
+  addInviteePerspective,
+  createInitialInvitation,
+  decryptInvitation,
+  encryptInvitation,
+  submitParaphrase,
+} from "./crypto.ts";
 import { createInvitationLink, parseInvitationLink } from "./link.ts";
 
 const baseUrl = "https://example.test/application";
 
 test("round trips an encrypted invitation through a portable link", async () => {
   const perspective = "A multiline perspective\ncon Unicode: こんにちは";
-  const state = createInitialInvitation(perspective);
+  const state = submitParaphrase(
+    addInviteePerspective(
+      createInitialInvitation(perspective),
+      "I wanted to respond carefully before deciding.",
+    ),
+    "inviter",
+    "I understand that you wanted time to respond carefully.",
+  );
   const invitation = await encryptInvitation(state);
   const link = createInvitationLink(baseUrl, invitation);
   const parsed = parseInvitationLink(link);

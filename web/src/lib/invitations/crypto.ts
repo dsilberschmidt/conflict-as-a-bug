@@ -8,6 +8,15 @@ const IV_LENGTH_BYTES = 12;
 const CASE_ID_LENGTH_BYTES = 16;
 const INITIAL_REVISION = 1;
 
+export type Participant = "inviter" | "invitee";
+export type ParaphraseStatus = "pending" | "clarificationRequested" | "accepted";
+
+export interface Paraphrase {
+  text: string;
+  status: ParaphraseStatus;
+  clarification?: string;
+}
+
 export interface Invitation {
   schemaVersion: typeof INVITATION_SCHEMA_VERSION;
   caseId: string;
@@ -15,6 +24,10 @@ export interface Invitation {
   perspectives: {
     inviter: string;
     invitee?: string;
+  };
+  paraphrases: {
+    inviter?: Paraphrase;
+    invitee?: Paraphrase;
   };
 }
 
@@ -93,8 +106,42 @@ function isCaseId(value: unknown): value is string {
   }
 }
 
+function isParticipant(value: unknown): value is Participant {
+  return value === "inviter" || value === "invitee";
+}
+
+function isParaphrase(value: unknown): value is Paraphrase {
+  if (!isRecord(value) || typeof value.text !== "string") {
+    return false;
+  }
+
+  if (value.status === "clarificationRequested") {
+    return (
+      hasExpectedFields(value, ["text", "status", "clarification"]) &&
+      typeof value.clarification === "string"
+    );
+  }
+
+  return (
+    (value.status === "pending" || value.status === "accepted") &&
+    hasExpectedFields(value, ["text", "status"])
+  );
+}
+
+function isParaphraseState(value: unknown): value is Invitation["paraphrases"] {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    Reflect.ownKeys(value).every((field) => isParticipant(field)) &&
+    (!Object.hasOwn(value, "inviter") || isParaphrase(value.inviter)) &&
+    (!Object.hasOwn(value, "invitee") || isParaphrase(value.invitee))
+  );
+}
+
 function isInvitation(value: unknown): value is Invitation {
-  if (!isRecord(value) || !hasExpectedFields(value, ["schemaVersion", "caseId", "revision", "perspectives"])) {
+  if (!isRecord(value) || !hasExpectedFields(value, ["schemaVersion", "caseId", "revision", "perspectives", "paraphrases"])) {
     return false;
   }
 
@@ -103,6 +150,7 @@ function isInvitation(value: unknown): value is Invitation {
     !isCaseId(value.caseId) ||
     typeof value.revision !== "number" ||
     !Number.isInteger(value.revision) ||
+    !Number.isSafeInteger(value.revision) ||
     value.revision < INITIAL_REVISION ||
     !isRecord(value.perspectives) ||
     !hasExpectedFields(
@@ -110,12 +158,21 @@ function isInvitation(value: unknown): value is Invitation {
       Object.hasOwn(value.perspectives, "invitee") ? ["inviter", "invitee"] : ["inviter"],
     ) ||
     typeof value.perspectives.inviter !== "string" ||
-    (Object.hasOwn(value.perspectives, "invitee") && typeof value.perspectives.invitee !== "string")
+    (Object.hasOwn(value.perspectives, "invitee") && typeof value.perspectives.invitee !== "string") ||
+    !isParaphraseState(value.paraphrases)
   ) {
     return false;
   }
 
   return true;
+}
+
+function nextRevision(invitation: Invitation): number {
+  if (invitation.revision === Number.MAX_SAFE_INTEGER) {
+    throw new Error("Invitation revision cannot be incremented");
+  }
+
+  return invitation.revision + 1;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -137,6 +194,7 @@ export function createInitialInvitation(perspective: string): Invitation {
     caseId,
     revision: INITIAL_REVISION,
     perspectives: { inviter: perspective },
+    paraphrases: {},
   };
 }
 
@@ -145,22 +203,103 @@ export function addInviteePerspective(
   invitation: Invitation,
   perspective: string,
 ): Invitation {
-  if (!isInvitation(invitation) || typeof perspective !== "string") {
+  if (
+    !isInvitation(invitation) ||
+    typeof perspective !== "string" ||
+    Object.hasOwn(invitation.perspectives, "invitee")
+  ) {
     throw new TypeError("Invalid invitation state");
-  }
-
-  if (invitation.revision === Number.MAX_SAFE_INTEGER) {
-    throw new Error("Invitation revision cannot be incremented");
   }
 
   return {
     ...invitation,
-    revision: invitation.revision + 1,
+    revision: nextRevision(invitation),
     perspectives: {
       ...invitation.perspectives,
       invitee: perspective,
     },
   };
+}
+
+/** Submits a paraphrase when its author is allowed to take the next turn. */
+export function submitParaphrase(
+  invitation: Invitation,
+  author: Participant,
+  text: string,
+): Invitation {
+  if (!isInvitation(invitation) || !isParticipant(author) || typeof text !== "string") {
+    throw new TypeError("Invalid invitation state");
+  }
+
+  const existing = invitation.paraphrases[author];
+
+  if (existing !== undefined && existing.status !== "clarificationRequested") {
+    throw new Error("Invalid paraphrase transition");
+  }
+
+  if (
+    (author === "inviter" &&
+      (!Object.hasOwn(invitation.perspectives, "invitee") ||
+        invitation.paraphrases.invitee !== undefined)) ||
+    (author === "invitee" && invitation.paraphrases.inviter?.status !== "accepted")
+  ) {
+    throw new Error("Invalid paraphrase transition");
+  }
+
+  return {
+    ...invitation,
+    revision: nextRevision(invitation),
+    paraphrases: {
+      ...invitation.paraphrases,
+      [author]: { text, status: "pending" },
+    },
+  };
+}
+
+/** Records acceptance or a clarification request from the paraphrase recipient. */
+export function reviewParaphrase(
+  invitation: Invitation,
+  reviewer: Participant,
+  accepted: boolean,
+  clarification?: string,
+): Invitation {
+  if (!isInvitation(invitation) || !isParticipant(reviewer) || typeof accepted !== "boolean") {
+    throw new TypeError("Invalid invitation state");
+  }
+
+  const author: Participant = reviewer === "inviter" ? "invitee" : "inviter";
+  const paraphrase = invitation.paraphrases[author];
+
+  if (
+    paraphrase?.status !== "pending" ||
+    (reviewer === "inviter" && invitation.paraphrases.inviter?.status !== "accepted")
+  ) {
+    throw new Error("Invalid paraphrase transition");
+  }
+
+  if (!accepted && (typeof clarification !== "string" || !clarification.trim())) {
+    throw new TypeError("Clarification must be a non-empty string");
+  }
+
+  return {
+    ...invitation,
+    revision: nextRevision(invitation),
+    paraphrases: {
+      ...invitation.paraphrases,
+      [author]: accepted
+        ? { text: paraphrase.text, status: "accepted" }
+        : { text: paraphrase.text, status: "clarificationRequested", clarification },
+    },
+  };
+}
+
+/** Reports whether both paraphrases have been accepted. */
+export function isMutualUnderstandingConfirmed(invitation: Invitation): boolean {
+  return (
+    isInvitation(invitation) &&
+    invitation.paraphrases.inviter?.status === "accepted" &&
+    invitation.paraphrases.invitee?.status === "accepted"
+  );
 }
 
 function assertEnvelope(envelope: unknown): asserts envelope is EncryptedInvitationEnvelope {

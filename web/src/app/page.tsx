@@ -12,6 +12,7 @@ export default function Home() {
   const [isCreating, setIsCreating] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
+  const [linkMessage, setLinkMessage] = useState("Invitation ready");
   const [error, setError] = useState("");
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -31,8 +32,32 @@ export default function Home() {
 
     try {
       const invitation = await encryptInvitation(createInitialInvitation(perspective));
-      setInvitationLink(createInvitationLink(window.location.origin, invitation));
-      setCanShare(typeof navigator.share === "function");
+      const link = createInvitationLink(window.location.origin, invitation);
+      setInvitationLink(link);
+
+      if (typeof navigator.share === "function") {
+        setCanShare(true);
+        try {
+          await navigator.share({
+            title: "Conflict as a Bug",
+            text: "An invitation to understand a perspective.",
+            url: link,
+          });
+        } catch (shareError) {
+          if (!(shareError instanceof DOMException && shareError.name === "AbortError")) {
+            setError("We couldn't share the link. You can copy it instead.");
+          }
+        }
+      } else {
+        setCanShare(false);
+        try {
+          await navigator.clipboard.writeText(link);
+          setIsCopied(true);
+          setLinkMessage("Link copied");
+        } catch {
+          setError("We couldn't copy the link. Please copy it manually.");
+        }
+      }
     } catch {
       setError("We couldn't prepare your invitation. Please try again.");
     } finally {
@@ -74,7 +99,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-stone-100 px-6 py-16 text-stone-950 sm:px-10 lg:px-12">
+    <main className="min-h-screen bg-white px-6 py-16 text-stone-950 sm:px-10 lg:px-12">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 rounded-3xl border border-stone-200 bg-white p-8 shadow-sm sm:p-10">
         <div className="flex flex-col gap-4">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-stone-500">
@@ -127,7 +152,7 @@ export default function Home() {
           <div className="flex flex-col gap-6">
             <section
               aria-labelledby="reviewed-perspective"
-              className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4"
+              className="rounded-2xl border border-stone-200 bg-white px-4 py-4"
             >
               <h2
                 id="reviewed-perspective"
@@ -170,7 +195,7 @@ export default function Home() {
                 className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4"
               >
                 <div>
-                  <h2 className="text-sm font-medium text-stone-700">Invitation ready</h2>
+                  <h2 className="text-sm font-medium text-stone-700">{linkMessage}</h2>
                   <p className="mt-1 text-sm leading-6 text-stone-600">
                     Share this link with the other person.
                   </p>
@@ -195,7 +220,7 @@ export default function Home() {
                       onClick={handleShareLink}
                       className="inline-flex items-center justify-center rounded-full border border-stone-300 bg-white px-5 py-3 text-sm font-medium text-stone-800 transition hover:bg-stone-100 focus:outline-none focus:ring-4 focus:ring-stone-200"
                     >
-                      Share
+                      Share invitation
                     </button>
                   ) : null}
                 </div>
