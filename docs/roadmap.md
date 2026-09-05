@@ -1,25 +1,24 @@
-# Roadmap
+# Roadmap hacia la submission
 
-## Hito actual
+Este es un calendario operativo, a grandes rasgos y deliberadamente conservador, desde el 5 de septiembre de 2026 hasta la submission. Las fechas son máximas: cada hito terminado antes adelanta el siguiente. La ampliación de alcance comienza solamente después de una v0.1 completa y demostrable.
 
-v0.1 cuenta con una interfaz inicial para A, cifrado local de invitaciones y un enlace portable. El cifrado usa un sobre separado de la `decryptionKey`; no hay persistencia ni backend.
+La fecha exacta debe confirmarse en el Hacker Dashboard. La información pública disponible apunta al domingo 13 de septiembre y presenta una discrepancia horaria. El plan adopta como límite conservador el 13 de septiembre a las 15:00 CEST y como límite interno el 12 de septiembre. Si el dashboard confirma el 16, los días adicionales serán margen.
 
-El formato actual es `/invite?v=…&a=…&iv=…&c=…#k=…`. El sobre viaja en la query y la clave solamente en el fragmento de la URL.
+## Calendario
 
-## Próximo paso
+- **5–6 de septiembre:** creación efectiva de la invitación, enlace compartible y pantalla receptora `/invite`.
+- **7–8 de septiembre:** perspectiva de B, parafraseo mutuo y confirmación o aclaración.
+- **9 de septiembre:** v0.1 privada funcionando de punta a punta y primer despliegue estable.
+- **10 de septiembre:** integración blockchain mínima y coherente, decisión definitiva de alcance y congelamiento del producto.
+- **11 de septiembre:** revisión funcional y de privacidad, README, texto de submission, guion y primera grabación completa del video.
+- **12 de septiembre:** video final de 2–4 minutos, despliegue final, carga de materiales y envío de la submission.
+- **13 de septiembre:** reserva exclusiva para resolver fallos graves antes del límite conservador.
 
-Conectar `Create invitation` con el cifrado, generar y mostrar el enlace para compartir, y crear la pantalla receptora `/invite` para B. La integración de la interfaz y la pantalla receptora están **pendientes**.
+## Ampliación posterior
 
-El almacenamiento futuro podrá reemplazar el sobre de la URL por un identificador y mantener la `decryptionKey` en el fragmento. El modelo de almacenamiento, el identificador, la retención y sus políticas de privacidad están **pendientes**.
+1. Robustez y privacidad.
+2. Caso semipúblico y solvers.
+3. Blockchain más completa.
+4. IA y otras funciones futuras.
 
-## Después
-
-1. Permitir que B lea la invitación y aporte su propia perspectiva.
-2. Incorporar el parafraseo mutuo entre A y B y la confirmación o aclaración de cada paráfrasis.
-3. Habilitar pedidos posteriores solo después de la comprensión confirmada.
-
-## Exploración futura
-
-- Casos semipúblicos, con alcance y privacidad **pendientes** de definición.
-- Solvers humanos o IA, con rol, consentimiento y límites **pendientes**.
-- Blockchain para consentimiento y procedencia, posterior a un flujo privado completo y demostrable; su utilidad, modelo de datos y garantías están **pendientes**.
+El alcance, los criterios de privacidad y el rol de cada integración posterior permanecen **pendientes** hasta completar una v0.1 privada y demostrable.

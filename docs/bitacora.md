@@ -8,6 +8,10 @@
 - **v0.1 — ruta alternativa:** la aplicación comienza cuando A prepara una invitación y ofrece un camino cuando la conversación directa es inviable, inadecuada, interrumpida o insuficiente.
 - **Interfaz inicial:** `web/src/app/page.tsx` permite redactar `How I see it`, revisar la invitación y volver a editarla.
 - **Cifrado de invitaciones:** `web/src/lib/invitations/crypto.ts` añade AES-256-GCM local con claves e IV aleatorios, sobre versionado base64url y clave separada del sobre.
+- **Enlace portable:** se implementó y verificó el enlace portable de invitación.
+- **Separación en el enlace:** el sobre cifrado viaja en la query y la clave solamente en el fragmento.
+- **Verificación:** las pruebas de crypto y enlaces, `lint` y build pasaron.
+- **Calendario:** `docs/roadmap.md` queda definido como calendario hacia la submission; el estado técnico vigente pertenece a `docs/context.md`, `docs/bitacora.md` y la documentación específica.
 
 ## Decisiones de producto y arquitectura
 
