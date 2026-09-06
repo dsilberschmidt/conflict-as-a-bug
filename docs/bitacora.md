@@ -17,6 +17,7 @@
 - **5 de septiembre de 2026 — estado versionado del caso privado:** `crypto.ts` establece el tipo `Invitation` con cinco campos: `schemaVersion`, `caseId`, `revision`, `perspectives` (`inviter: string`, `invitee?: string`) y `paraphrases` (`inviter?: Paraphrase`, `invitee?: Paraphrase`); añade el tipo unión `Participant` (`"inviter" | "invitee"`) y la interfaz `Paraphrase` (`text`, `status`, `clarification?`). `test:crypto` asciende a 7/7.
 - **5 de septiembre de 2026 — flujo de respuesta de la persona invitada:** `/invite` permite que B escriba su perspectiva, genere la cápsula de respuesta cifrada y obtenga el enlace para devolver a A.
 - **5 de septiembre de 2026 — paráfrasis mutua:** el flujo end-to-end queda implementado y verificado — A y B se parafrasean, confirman o aclaran, y la comprensión mutua confirmada cierra el ciclo.
+- **6 de septiembre de 2026 — primer despliegue:** producción en `https://conflict-as-a-bug.vercel.app`; flujo end-to-end verificado en vivo (perspectiva de A → enlace → `/invite` → perspectiva de B → paráfrasis mutua → confirmación). Cierra el hito del 9 de septiembre del roadmap.
 
 ## Decisiones de producto y arquitectura
 

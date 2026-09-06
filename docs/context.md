@@ -32,7 +32,7 @@ El sobre es el único artefacto apto para almacenar. La `decryptionKey` se devue
 
 ## Límite actual
 
-El flujo end-to-end está conectado. Lo que no existe todavía es persistencia del lado del servidor (por diseño y según la arquitectura acordada: el servidor no almacena el caso) y el despliegue (no hay configuración de Vercel, Netlify ni CI en el repositorio).
+El flujo end-to-end está conectado y desplegado en producción (`https://conflict-as-a-bug.vercel.app`). Lo que no existe todavía es persistencia del lado del servidor (por diseño y según la arquitectura acordada: el servidor no almacena el caso).
 
 ## Verificación para continuidad
 
