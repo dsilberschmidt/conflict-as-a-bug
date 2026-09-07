@@ -7,9 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:crypto": "node --test src/lib/invitations/crypto.test.mjs"
+    "test:crypto": "node --test src/lib/invitations/crypto.test.mjs",
+    "test:cases": "node --test src/lib/cases/store.test.mjs"
   },
   "dependencies": {
+    "@upstash/redis": "^1.38.4",
+    "ethers": "^6.17.0",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -26,5 +29,6 @@
   },
   "allowScripts": {
     "unrs-resolver@1.12.2": true
-  }
+  },
+  "type": "module"
 }
