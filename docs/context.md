@@ -30,9 +30,44 @@ La interfaz está implementada con Next.js. `web/src/app/page.tsx` permite a A r
 
 El sobre es el único artefacto apto para almacenar. La `decryptionKey` se devuelve por separado y debe circular por un canal distinto.
 
+## Backend de casos y contrato (sin desplegar)
+
+`web/src/lib/cases/` implementa el almacenamiento server-side para la fase de
+apertura a solvers. `createCaseStore(client)` es una fábrica que recibe cualquier
+implementación de `KvClient`, lo que permite tests sin Redis real. El singleton
+`caseStore` usa `@upstash/redis` e inicializa el cliente de forma diferida (lanza en
+el primer uso, no al importar). Las operaciones cubren creación de casos, estado
+(`opened / closed / solved`), contribuciones de solvers y resumen público. Cinco
+rutas API bajo `web/src/app/api/cases/` exponen estas operaciones.
+
+`web/src/lib/chain/registry.ts` implementa `CaseRegistryClient` (ethers v6):
+convierte el `caseId` string a `bytes32` vía `keccak256` y llama `openCase`,
+`closeCase` y `solveCase` en el contrato. `getCaseRegistryClient()` lanza si las
+variables de entorno (`CASE_REGISTRY_RPC_URL`, `CASE_REGISTRY_BACKEND_PRIVATE_KEY`,
+`CASE_REGISTRY_CONTRACT_ADDRESS`) no están definidas.
+
+`contracts/CaseRegistry.sol` es el registro on-chain: guarda un hash de estado y un
+enum (`None / Opened / Closed / Solved`) por `caseId`; no almacena contenido. Hardhat
+3 con 13 tests pasando. No está desplegado: requiere RPC URL y clave con fondos de
+testnet en Sepolia.
+
+Dos simplificaciones marcadas como PROVISIONAL en el código:
+
+- Las transiciones on-chain las firma un único `backendSigner` del backend (en lugar
+  del consentimiento por parte vía Privy — deferred to bonus phase).
+- El resumen se producirá mediante llamada a IA externa directa, sin Chainlink CRE
+  (deferred to bonus phase).
+
 ## Límite actual
 
-El flujo end-to-end está conectado y desplegado en producción (`https://conflict-as-a-bug.vercel.app`). Lo que no existe todavía es persistencia del lado del servidor (por diseño y según la arquitectura acordada: el servidor no almacena el caso).
+El flujo end-to-end está conectado y desplegado en producción (`https://conflict-as-a-bug.vercel.app`).
+
+La fase privada entre A y B sigue sin persistencia server-side, por diseño: el
+estado viaja cifrado en las URLs y el servidor no almacena el caso.
+
+La fase de apertura a solvers sí tiene persistencia server-side en Upstash Redis
+(ver sección anterior). Lo que no existe todavía es el despliegue del contrato a
+Sepolia ni el wiring entre las rutas API y el contrato.
 
 ## Verificación para continuidad
 
@@ -43,6 +78,9 @@ npm run lint        # sin warnings
 npm run test:crypto # 7/7
 npm run build       # compila / e /invite como estáticas
 node --test src/lib/invitations/link.test.mjs  # 4/4; aún sin script en package.json
+npm run test:cases        # 7/7 (store con fake in-memory, desde web/)
+# desde contracts/:
+npm run test:offline      # 13/13 (solc local, sin red)
 ```
 
 ## Flujo de trabajo

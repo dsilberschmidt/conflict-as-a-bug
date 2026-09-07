@@ -18,6 +18,20 @@
 - **5 de septiembre de 2026 — flujo de respuesta de la persona invitada:** `/invite` permite que B escriba su perspectiva, genere la cápsula de respuesta cifrada y obtenga el enlace para devolver a A.
 - **5 de septiembre de 2026 — paráfrasis mutua:** el flujo end-to-end queda implementado y verificado — A y B se parafrasean, confirman o aclaran, y la comprensión mutua confirmada cierra el ciclo.
 - **6 de septiembre de 2026 — primer despliegue:** producción en `https://conflict-as-a-bug.vercel.app`; flujo end-to-end verificado en vivo (perspectiva de A → enlace → `/invite` → perspectiva de B → paráfrasis mutua → confirmación). Cierra el hito del 9 de septiembre del roadmap.
+- **7 de septiembre de 2026 — backend de casos y contrato (sin desplegar):**
+  `web/src/lib/cases/` implementa persistencia server-side en Upstash Redis
+  (`@upstash/redis`): fábrica `createCaseStore` con interfaz `KvClient` inyectable
+  (testable sin Redis real), operaciones de creación, estado y contribuciones de
+  solvers, y singleton `caseStore` que falla en el primer uso (no al importar) si
+  faltan credenciales. Cinco rutas API bajo `web/src/app/api/cases/` cubren
+  creación, lectura, contribuciones, cambio de estado y resumen. `web/src/lib/chain/`
+  agrega `CaseRegistryClient` (ethers v6) y los helpers de hash para interactuar con
+  el contrato. `contracts/CaseRegistry.sol` define el registro on-chain: hash de
+  estado + enum (`None / Opened / Closed / Solved`) por `caseId` — sin contenido
+  on-chain. Firmado por un único `backendSigner` del backend (PROVISIONAL: sustituye
+  el consentimiento por parte vía Privy). El resumen será producido por llamada a IA
+  externa directa (PROVISIONAL: sin Chainlink CRE). Hardhat 3 con 13 tests pasando;
+  contrato no desplegado — requiere RPC URL y clave con fondos en Sepolia.
 
 ## Decisiones de producto y arquitectura
 
@@ -28,12 +42,23 @@
 - La interfaz se implementa con Next.js; el cifrado se mantiene independiente del framework.
 - Solo el sobre cifrado puede almacenarse; la `decryptionKey` debe mantenerse en un canal separado.
 - La forma concreta de persistir el sobre y distribuir la clave sigue **pendiente**.
+- La apertura de un caso a solvers persiste en el servidor (Upstash Redis). La fase
+  privada A/B sigue sin persistencia server-side por diseño.
+- Las transiciones on-chain las firma un único signer del backend (PROVISIONAL, en
+  lugar de consentimiento por parte vía Privy). El resumen se producirá mediante
+  llamada a IA externa directa (PROVISIONAL, sin Chainlink CRE). Ambas
+  simplificaciones están marcadas en el código; Privy y Chainlink quedan para la fase
+  bonus si hay tiempo.
 
 ## Estado actual verificado
 
 - El flujo end-to-end está implementado: redactar → generar enlace → `/invite` (leer perspectiva de A, escribir perspectiva de B, generar enlace de respuesta) → parafrasear → confirmar comprensión mutua.
 - `npm run lint` pasa sin warnings; `npm run test:crypto` pasa 7/7; `npm run build` compila `/` e `/invite` como rutas estáticas.
 - `src/lib/invitations/link.test.mjs` existe y pasa 4/4 con `node --test` pero no está enganchado a ningún script de `package.json`; convendría agregar `test:link` o unificar ambas suites en un único script.
+- `npm run test:cases` (desde `web/`) corre 7 tests del store con fake in-memory;
+  pasa sin Redis real.
+- `npm run test:offline` (desde `contracts/`) corre los 13 tests del contrato con
+  `solc` local; pasa sin red.
 
 ## Próximas entradas
 
