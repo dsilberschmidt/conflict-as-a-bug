@@ -1,0 +1,49 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-f286173e38d26811a3508d256601096ee2c62f0a",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.15.0"
+  },
+  "userSourceNameMap": {
+    "contracts/CaseRegistry.sol": "project/contracts/CaseRegistry.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/CaseRegistry.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\n\n/// @title CaseRegistry\n/// @notice Lightweight on-chain source of truth for which CAB cases exist to\n/// solvers and what status they're in. Stores a state hash (linking to the\n/// off-chain content in Upstash) plus a status enum per case. Block\n/// timestamps provide the date; no content lives on-chain.\n///\n/// PROVISIONAL: every transition below is gated by a single `backendSigner`\n/// key, standing in for the real design — each party signing their own\n/// consent via a Privy wallet. This whole contract is the minimum-path\n/// version; Privy-based per-party signing is deferred to the bonus phase.\ncontract CaseRegistry {\n    enum Status {\n        None,\n        Opened,\n        Closed,\n        Solved\n    }\n\n    struct CaseState {\n        bytes32 stateHash;\n        Status status;\n        uint40 lastUpdatedAt;\n    }\n\n    address public backendSigner;\n\n    mapping(bytes32 => CaseState) private cases;\n\n    event CaseOpened(bytes32 indexed caseId, bytes32 stateHash, uint256 timestamp);\n    event CaseClosed(bytes32 indexed caseId, uint256 timestamp);\n    event CaseSolved(bytes32 indexed caseId, uint256 timestamp);\n    event BackendSignerUpdated(address indexed previousSigner, address indexed newSigner);\n\n    error NotBackendSigner();\n    error CaseAlreadyExists();\n    error CaseNotFound();\n    error InvalidTransition();\n    error ZeroAddress();\n\n    modifier onlyBackendSigner() {\n        if (msg.sender != backendSigner) revert NotBackendSigner();\n        _;\n    }\n\n    constructor(address initialBackendSigner) {\n        if (initialBackendSigner == address(0)) revert ZeroAddress();\n        backendSigner = initialBackendSigner;\n    }\n\n    /// @notice Rotates the backend signer key.\n    function setBackendSigner(address newSigner) external onlyBackendSigner {\n        if (newSigner == address(0)) revert ZeroAddress();\n        emit BackendSignerUpdated(backendSigner, newSigner);\n        backendSigner = newSigner;\n    }\n\n    /// @notice Opens a case to solvers.\n    /// Real design: both parties consent independently (Privy, bonus phase).\n    /// PROVISIONAL: a single backend signer call stands in for that dual consent.\n    function openCase(bytes32 caseId, bytes32 stateHash) external onlyBackendSigner {\n        if (cases[caseId].status != Status.None) revert CaseAlreadyExists();\n\n        cases[caseId] = CaseState({\n            stateHash: stateHash,\n            status: Status.Opened,\n            lastUpdatedAt: uint40(block.timestamp)\n        });\n\n        emit CaseOpened(caseId, stateHash, block.timestamp);\n    }\n\n    /// @notice Closes a case to new solver contributions.\n    /// Real design: either party alone can request this.\n    /// PROVISIONAL: enforced off-chain by the backend before calling this,\n    /// since only the backend signer can call it.\n    function closeCase(bytes32 caseId) external onlyBackendSigner {\n        CaseState storage current = cases[caseId];\n\n        if (current.status == Status.None) revert CaseNotFound();\n        if (current.status != Status.Opened) revert InvalidTransition();\n\n        current.status = Status.Closed;\n        current.lastUpdatedAt = uint40(block.timestamp);\n\n        emit CaseClosed(caseId, block.timestamp);\n    }\n\n    /// @notice Marks a case solved. Independent of closing — a case can be\n    /// solved while still open, or after being closed.\n    /// Real design: requires both parties to confirm.\n    /// PROVISIONAL: the backend calls this only after its own off-chain store\n    /// has recorded both confirmations.\n    function solveCase(bytes32 caseId) external onlyBackendSigner {\n        CaseState storage current = cases[caseId];\n\n        if (current.status == Status.None) revert CaseNotFound();\n        if (current.status == Status.Solved) revert InvalidTransition();\n\n        current.status = Status.Solved;\n        current.lastUpdatedAt = uint40(block.timestamp);\n\n        emit CaseSolved(caseId, block.timestamp);\n    }\n\n    /// @notice Reads a case's on-chain state. Returns the zero value\n    /// (status == None) for a caseId that was never opened.\n    function getCase(bytes32 caseId) external view returns (CaseState memory) {\n        return cases[caseId];\n    }\n}\n"
+      }
+    }
+  }
+}
