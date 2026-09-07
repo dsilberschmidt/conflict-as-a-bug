@@ -18,6 +18,12 @@
 - **5 de septiembre de 2026 — flujo de respuesta de la persona invitada:** `/invite` permite que B escriba su perspectiva, genere la cápsula de respuesta cifrada y obtenga el enlace para devolver a A.
 - **5 de septiembre de 2026 — paráfrasis mutua:** el flujo end-to-end queda implementado y verificado — A y B se parafrasean, confirman o aclaran, y la comprensión mutua confirmada cierra el ciclo.
 - **6 de septiembre de 2026 — primer despliegue:** producción en `https://conflict-as-a-bug.vercel.app`; flujo end-to-end verificado en vivo (perspectiva de A → enlace → `/invite` → perspectiva de B → paráfrasis mutua → confirmación). Cierra el hito del 9 de septiembre del roadmap.
+- **7 de septiembre de 2026 — Fase 2 cerrada: contrato en Sepolia verificado
+  end-to-end:** `POST /api/cases` en producción
+  (`https://conflict-as-a-bug.vercel.app`) devuelve 201 y emite una transacción
+  real `openCase` confirmada en Sepolia Etherscan contra el contrato
+  `0x3a53Ec28B5DD9c253C893eE1354083Bad3Cea98A`. El wiring Upstash ↔ contrato
+  funciona en producción. Cierra la Fase 2 del roadmap.
 - **7 de septiembre de 2026 — backend de casos y contrato (sin desplegar):**
   `web/src/lib/cases/` implementa persistencia server-side en Upstash Redis
   (`@upstash/redis`): fábrica `createCaseStore` con interfaz `KvClient` inyectable
@@ -49,6 +55,12 @@
   llamada a IA externa directa (PROVISIONAL, sin Chainlink CRE). Ambas
   simplificaciones están marcadas en el código; Privy y Chainlink quedan para la fase
   bonus si hay tiempo.
+- La integración de Vercel Marketplace para Upstash inyecta
+  `UPSTASH_REDIS_KV_REST_API_URL` / `UPSTASH_REDIS_KV_REST_API_TOKEN` (con el
+  nombre del store en el medio), no `UPSTASH_REDIS_REST_URL` /
+  `UPSTASH_REDIS_REST_TOKEN` como sugiere la documentación genérica de Upstash.
+  `createRedisClient()` acepta los tres alias para no depender del nombre exacto
+  que inyecte cada integración.
 
 ## Estado actual verificado
 
@@ -59,6 +71,10 @@
   pasa sin Redis real.
 - `npm run test:offline` (desde `contracts/`) corre los 13 tests del contrato con
   `solc` local; pasa sin red.
+- `npm run test:chain-sync` (desde `web/`) corre 7 tests de los helpers on-chain
+  con fakes; pasa sin red.
+- `POST /api/cases` en producción emite `openCase` en Sepolia y devuelve 201;
+  verificado en Sepolia Etherscan.
 
 ## Próximas entradas
 

@@ -30,7 +30,7 @@ La interfaz está implementada con Next.js. `web/src/app/page.tsx` permite a A r
 
 El sobre es el único artefacto apto para almacenar. La `decryptionKey` se devuelve por separado y debe circular por un canal distinto.
 
-## Backend de casos y contrato (sin desplegar)
+## Backend de casos y contrato Sepolia
 
 `web/src/lib/cases/` implementa el almacenamiento server-side para la fase de
 apertura a solvers. `createCaseStore(client)` es una fábrica que recibe cualquier
@@ -48,8 +48,14 @@ variables de entorno (`CASE_REGISTRY_RPC_URL`, `CASE_REGISTRY_BACKEND_PRIVATE_KE
 
 `contracts/CaseRegistry.sol` es el registro on-chain: guarda un hash de estado y un
 enum (`None / Opened / Closed / Solved`) por `caseId`; no almacena contenido. Hardhat
-3 con 13 tests pasando. No está desplegado: requiere RPC URL y clave con fondos de
-testnet en Sepolia.
+3 con 13 tests pasando. Desplegado en Sepolia:
+`0x3a53Ec28B5DD9c253C893eE1354083Bad3Cea98A`.
+
+La integración de Vercel Marketplace para Upstash inyecta
+`UPSTASH_REDIS_KV_REST_API_URL` / `UPSTASH_REDIS_KV_REST_API_TOKEN` — con el
+nombre del store en el medio — en lugar de `UPSTASH_REDIS_REST_URL` /
+`UPSTASH_REDIS_REST_TOKEN` que sugiere la documentación genérica de Upstash.
+`createRedisClient()` acepta los tres variantes de nombres como alias.
 
 Dos simplificaciones marcadas como PROVISIONAL en el código:
 
@@ -65,9 +71,10 @@ El flujo end-to-end está conectado y desplegado en producción (`https://confli
 La fase privada entre A y B sigue sin persistencia server-side, por diseño: el
 estado viaja cifrado en las URLs y el servidor no almacena el caso.
 
-La fase de apertura a solvers sí tiene persistencia server-side en Upstash Redis
-(ver sección anterior). Lo que no existe todavía es el despliegue del contrato a
-Sepolia ni el wiring entre las rutas API y el contrato.
+La fase de apertura a solvers tiene persistencia server-side en Upstash Redis y
+registra cada transición de estado en el contrato desplegado en Sepolia. El wiring
+está verificado end-to-end en producción: `POST /api/cases` persiste en Upstash y
+emite `openCase` en Sepolia en la misma llamada.
 
 ## Verificación para continuidad
 
@@ -79,6 +86,7 @@ npm run test:crypto # 7/7
 npm run build       # compila / e /invite como estáticas
 node --test src/lib/invitations/link.test.mjs  # 4/4; aún sin script en package.json
 npm run test:cases        # 7/7 (store con fake in-memory, desde web/)
+npm run test:chain-sync   # 7/7 (helpers on-chain con fakes, desde web/)
 # desde contracts/:
 npm run test:offline      # 13/13 (solc local, sin red)
 ```
