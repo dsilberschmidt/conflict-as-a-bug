@@ -147,22 +147,29 @@ export type CaseStore = ReturnType<typeof createCaseStore>;
 /**
  * Builds the Redis client from env vars, without throwing at import time.
  *
- * Reads UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN. The Vercel
- * Marketplace Upstash integration also injects the legacy
- * KV_REST_API_URL / KV_REST_API_TOKEN aliases, which are accepted too.
+ * Reads UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN. Also accepts the
+ * aliases KV_REST_API_URL / KV_REST_API_TOKEN and
+ * UPSTASH_REDIS_KV_REST_API_URL / UPSTASH_REDIS_KV_REST_API_TOKEN injected
+ * by different variants of the Vercel Marketplace Upstash integration.
  * (@vercel/kv itself is deprecated — Vercel KV was sunset in favor of
  * Upstash Redis via the Marketplace; see the project's persistence decision.)
  */
 function createRedisClient(): KvClient {
-  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
+  const url =
+    process.env.UPSTASH_REDIS_REST_URL ??
+    process.env.KV_REST_API_URL ??
+    process.env.UPSTASH_REDIS_KV_REST_API_URL;
+  const token =
+    process.env.UPSTASH_REDIS_REST_TOKEN ??
+    process.env.KV_REST_API_TOKEN ??
+    process.env.UPSTASH_REDIS_KV_REST_API_TOKEN;
 
   if (!url || !token) {
     const missingCredentials = (): never => {
       throw new Error(
         "Missing Upstash Redis credentials: set UPSTASH_REDIS_REST_URL and " +
-          "UPSTASH_REDIS_REST_TOKEN (or install the Upstash integration from the " +
-          "Vercel Marketplace, which injects KV_REST_API_URL / KV_REST_API_TOKEN).",
+          "UPSTASH_REDIS_REST_TOKEN (also accepted: KV_REST_API_URL / KV_REST_API_TOKEN " +
+          "or UPSTASH_REDIS_KV_REST_API_URL / UPSTASH_REDIS_KV_REST_API_TOKEN).",
       );
     };
 
