@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { caseStore } from "../../../../../lib/cases/store";
 import type { CaseStatus } from "../../../../../lib/cases/types";
+import { tryCloseOnChain, trySolveOnChain } from "../../../../../lib/chain/sync";
 
 const VALID_STATUSES: CaseStatus[] = ["opened", "closed", "solved"];
 
@@ -37,6 +38,8 @@ export async function POST(
 
   try {
     const record = await caseStore.setStatus(caseId, status as CaseStatus);
+    if (status === "closed") await tryCloseOnChain(caseId);
+    if (status === "solved") await trySolveOnChain(caseId);
     return NextResponse.json({ caseId: record.caseId, status: record.status });
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Case not found")) {

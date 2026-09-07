@@ -1,13 +1,15 @@
 import { Contract, JsonRpcProvider, Wallet, keccak256, toUtf8Bytes } from "ethers";
 
-import caseRegistryAbi from "./CaseRegistry.abi.json";
+import caseRegistryAbi from "./CaseRegistry.abi.json" with { type: "json" };
 
-export enum ChainCaseStatus {
-  None = 0,
-  Opened = 1,
-  Closed = 2,
-  Solved = 3,
-}
+export const ChainCaseStatus = {
+  None: 0,
+  Opened: 1,
+  Closed: 2,
+  Solved: 3,
+} as const;
+
+export type ChainCaseStatus = (typeof ChainCaseStatus)[keyof typeof ChainCaseStatus];
 
 export interface ChainCaseState {
   stateHash: string;
@@ -79,10 +81,8 @@ export class CaseRegistryClient {
  * Builds the client from env vars, without throwing at import time — mirrors
  * the pattern used for the Upstash client in lib/cases/store.ts. Reads
  * CASE_REGISTRY_RPC_URL, CASE_REGISTRY_BACKEND_PRIVATE_KEY, and
- * CASE_REGISTRY_CONTRACT_ADDRESS. None of these exist yet: the contract
- * hasn't been deployed to Sepolia. Calling any method before deployment (and
- * before these env vars are set) throws with a clear message instead of
- * silently no-opping.
+ * CASE_REGISTRY_CONTRACT_ADDRESS. If any are missing, throws with a clear
+ * message instead of silently no-opping.
  */
 export function getCaseRegistryClient(): CaseRegistryClient {
   const rpcUrl = process.env.CASE_REGISTRY_RPC_URL;

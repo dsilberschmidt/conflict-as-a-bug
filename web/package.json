@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:crypto": "node --test src/lib/invitations/crypto.test.mjs",
-    "test:cases": "node --test src/lib/cases/store.test.mjs"
+    "test:cases": "node --test src/lib/cases/store.test.mjs",
+    "test:chain-sync": "node --test src/lib/chain/sync.test.mjs"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.4",
