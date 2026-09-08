@@ -9,3 +9,7 @@ export function toPublicCase(record: CaseRecord): PublicCase {
     ? { caseId, status, createdAt }
     : { caseId, status, createdAt, summary };
 }
+
+export function sortCasesByCreatedAt(cases: PublicCase[]): PublicCase[] {
+  return [...cases].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+}

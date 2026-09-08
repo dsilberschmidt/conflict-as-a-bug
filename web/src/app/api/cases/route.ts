@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import type { CaseRecord } from "../../../lib/cases/types";
 import { caseStore } from "../../../lib/cases/store";
-import { toPublicCase } from "../../../lib/cases/public-view";
+import { toPublicCase, sortCasesByCreatedAt } from "../../../lib/cases/public-view";
 import type { EncryptedInvitationEnvelope } from "../../../lib/invitations/crypto";
 import { tryOpenOnChain } from "../../../lib/chain/sync";
 
@@ -68,9 +68,11 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   const caseIds = await caseStore.listCasesByStatus("opened");
   const records = await Promise.all(caseIds.map((id) => caseStore.getCase(id)));
-  const cases = records
-    .filter((record): record is CaseRecord => record !== null)
-    .map(toPublicCase);
+  const cases = sortCasesByCreatedAt(
+    records
+      .filter((record): record is CaseRecord => record !== null)
+      .map(toPublicCase),
+  );
 
   return NextResponse.json({ cases });
 }

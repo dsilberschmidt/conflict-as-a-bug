@@ -1,15 +1,17 @@
 export const dynamic = "force-dynamic";
 
 import { caseStore } from "../../lib/cases/store.ts";
-import { toPublicCase } from "../../lib/cases/public-view.ts";
+import { toPublicCase, sortCasesByCreatedAt } from "../../lib/cases/public-view.ts";
 import type { PublicCase } from "../../lib/cases/public-view.ts";
 
 export default async function ShowcasePage() {
   const caseIds = await caseStore.listCasesByStatus("opened");
   const records = await Promise.all(caseIds.map((id) => caseStore.getCase(id)));
-  const cases = records
-    .filter((record): record is NonNullable<typeof record> => record !== null)
-    .map(toPublicCase);
+  const cases = sortCasesByCreatedAt(
+    records
+      .filter((record): record is NonNullable<typeof record> => record !== null)
+      .map(toPublicCase),
+  );
 
   return (
     <main className="min-h-screen bg-stone-50 px-6 py-16 text-stone-950 sm:px-10 lg:px-12">
