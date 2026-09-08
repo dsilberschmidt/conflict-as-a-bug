@@ -4,16 +4,20 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
+  addConsent,
   addInviteePerspective,
+  bothConsented,
   decryptInvitation,
   encryptInvitation,
   isMutualUnderstandingConfirmed,
   reviewParaphrase,
+  setOpenEnvelope,
   submitParaphrase,
   type Invitation,
   type Participant,
 } from "../../lib/invitations/crypto";
 import { createInvitationLink, parseInvitationLink } from "../../lib/invitations/link";
+import { useConsentSigner } from "../../lib/privy/useConsentSigner";
 
 type InvitationState =
   | { status: "loading" }
@@ -92,7 +96,9 @@ export default function InvitationPage() {
   const [shareLabel, setShareLabel] = useState("Share reflection");
   const [linkMessage, setLinkMessage] = useState("Link ready");
   const [error, setError] = useState("");
+  const [infoMessage, setInfoMessage] = useState("");
   const router = useRouter();
+  const { signConsentMessage } = useConsentSigner();
 
   useEffect(() => {
     let isCurrent = true;
@@ -308,25 +314,56 @@ export default function InvitationPage() {
     if (invitation.status !== "ready") return;
 
     const inv = invitation.invitation;
-    const caseId = inv.caseId;
-
-    const plaintext = [
-      `A's perspective:\n${inv.perspectives.inviter}`,
-      `B's perspective:\n${inv.perspectives.invitee ?? ""}`,
-      `A's understanding of B:\n${inv.paraphrases.inviter?.text ?? ""}`,
-      `B's understanding of A:\n${inv.paraphrases.invitee?.text ?? ""}`,
-    ].join("\n\n");
+    const existingConsents = inv.consents ?? [];
 
     setError("");
+    setInfoMessage("");
+    setIsCopied(false);
     setIsCreating(true);
 
     try {
-      const { envelope } = await encryptInvitation(inv);
+      if (existingConsents.length === 0) {
+        const { envelope } = await encryptInvitation(inv);
+        const consent = await signConsentMessage(inv.caseId, JSON.stringify(envelope));
+        let updated = setOpenEnvelope(inv, envelope);
+        updated = addConsent(updated, consent);
+
+        await createLink(updated, "Ask the other person to open this to solvers too");
+        setInvitation({ status: "ready", invitation: updated });
+        setInfoMessage("You've consented. Waiting for the other person.");
+        return;
+      }
+
+      const openEnvelope = inv.openEnvelope;
+
+      if (!openEnvelope) {
+        setError("We couldn't find the consent request. Please ask the other person for a new link.");
+        return;
+      }
+
+      const consent = await signConsentMessage(inv.caseId, JSON.stringify(openEnvelope));
+
+      if (existingConsents.some((existing) => existing.address === consent.address)) {
+        setInfoMessage("You've already consented. Waiting for the other person.");
+        return;
+      }
+
+      const updated = addConsent(inv, consent);
+      const plaintext = [
+        `A's perspective:\n${inv.perspectives.inviter}`,
+        `B's perspective:\n${inv.perspectives.invitee ?? ""}`,
+        `A's understanding of B:\n${inv.paraphrases.inviter?.text ?? ""}`,
+        `B's understanding of A:\n${inv.paraphrases.invitee?.text ?? ""}`,
+      ].join("\n\n");
 
       const openResponse = await fetch("/api/cases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseId, envelope }),
+        body: JSON.stringify({
+          caseId: inv.caseId,
+          envelope: openEnvelope,
+          consents: updated.consents,
+        }),
       });
 
       if (!openResponse.ok) {
@@ -337,13 +374,13 @@ export default function InvitationPage() {
         return;
       }
 
-      void fetch(`/api/cases/${caseId}/summary/generate`, {
+      void fetch(`/api/cases/${inv.caseId}/summary/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: plaintext }),
       }).catch((err) => console.error("[summarize] failed:", err));
 
-      router.push(`/showcase/${caseId}`);
+      router.push(`/showcase/${inv.caseId}`);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -650,19 +687,32 @@ export default function InvitationPage() {
                   perspectives.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={handleOpenToSolvers}
-                disabled={isCreating}
-                className="inline-flex w-fit rounded-full bg-stone-900 px-5 py-3 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {isCreating ? "Opening…" : "Open to solvers"}
-              </button>
+              {bothConsented(invitation.invitation) ? (
+                <p className="text-sm leading-6 text-stone-600">
+                  This case has already been opened.
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleOpenToSolvers}
+                  disabled={isCreating}
+                  className="inline-flex w-fit rounded-full bg-stone-900 px-5 py-3 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {isCreating
+                    ? "Opening…"
+                    : (invitation.invitation.consents?.length ?? 0) === 0
+                      ? "Open to solvers"
+                      : "Consent to open"}
+                </button>
+              )}
             </div>
           </div>
         ) : null}
 
         {error ? <p role="alert" className="text-sm leading-6 text-stone-600">{error}</p> : null}
+        {infoMessage ? (
+          <p role="alert" className="text-sm leading-6 text-stone-600">{infoMessage}</p>
+        ) : null}
 
         {updatedLink ? (
           <section aria-live="polite" className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4">
