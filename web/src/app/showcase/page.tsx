@@ -1,5 +1,7 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
+
 import { caseStore } from "../../lib/cases/store.ts";
 import { toPublicCase, sortCasesByCreatedAt } from "../../lib/cases/public-view.ts";
 import type { PublicCase } from "../../lib/cases/public-view.ts";
@@ -37,7 +39,9 @@ export default async function ShowcasePage() {
           <ul className="flex flex-col gap-4">
             {cases.map((c) => (
               <li key={c.caseId}>
-                <CaseCard c={c} />
+                <Link href={`/showcase/${c.caseId}`} className="block">
+                  <CaseCard c={c} />
+                </Link>
               </li>
             ))}
           </ul>
@@ -55,7 +59,7 @@ function CaseCard({ c }: { c: PublicCase }) {
   });
 
   return (
-    <article className="rounded-2xl border border-stone-200 bg-white px-6 py-5 shadow-sm">
+    <article className="rounded-2xl border border-stone-200 bg-white px-6 py-5 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-4">
           <p className="break-all font-mono text-xs text-stone-400">{c.caseId}</p>
