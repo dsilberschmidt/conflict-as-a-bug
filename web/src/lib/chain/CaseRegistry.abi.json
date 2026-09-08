@@ -22,6 +22,43 @@
   },
   {
     "inputs": [],
+    "name": "ConsentHashMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "DuplicateConsentSigner",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ECDSAInvalidSignature",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "length",
+        "type": "uint256"
+      }
+    ],
+    "name": "ECDSAInvalidSignatureLength",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "s",
+        "type": "bytes32"
+      }
+    ],
+    "name": "ECDSAInvalidSignatureS",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidTransition",
     "type": "error"
   },
@@ -109,6 +146,37 @@
       },
       {
         "indexed": false,
+        "internalType": "bytes32",
+        "name": "stateHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "firstSigner",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "CasePendingConsent",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "caseId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
         "internalType": "uint256",
         "name": "timestamp",
         "type": "uint256"
@@ -149,6 +217,29 @@
         "internalType": "bytes32",
         "name": "caseId",
         "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "stateHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes",
+        "name": "signature",
+        "type": "bytes"
+      }
+    ],
+    "name": "consentToOpen",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "caseId",
+        "type": "bytes32"
       }
     ],
     "name": "getCase",
@@ -169,6 +260,11 @@
             "internalType": "uint40",
             "name": "lastUpdatedAt",
             "type": "uint40"
+          },
+          {
+            "internalType": "address",
+            "name": "firstConsentSigner",
+            "type": "address"
           }
         ],
         "internalType": "struct CaseRegistry.CaseState",
@@ -177,24 +273,6 @@
       }
     ],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "caseId",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "stateHash",
-        "type": "bytes32"
-      }
-    ],
-    "name": "openCase",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

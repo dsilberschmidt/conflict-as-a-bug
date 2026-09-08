@@ -4,7 +4,6 @@ import type { CaseRecord } from "../../../lib/cases/types";
 import { caseStore } from "../../../lib/cases/store";
 import { toPublicCase, sortCasesByCreatedAt } from "../../../lib/cases/public-view";
 import type { EncryptedInvitationEnvelope } from "../../../lib/invitations/crypto";
-import { tryOpenOnChain } from "../../../lib/chain/sync";
 
 function isEnvelope(value: unknown): value is EncryptedInvitationEnvelope {
   if (typeof value !== "object" || value === null) return false;
@@ -48,7 +47,6 @@ export async function POST(request: NextRequest) {
 
   try {
     const created = await caseStore.createCase(caseId, envelope);
-    await tryOpenOnChain(caseId, envelope.ciphertext);
     return NextResponse.json(toPublicCase(created), { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Case already exists")) {

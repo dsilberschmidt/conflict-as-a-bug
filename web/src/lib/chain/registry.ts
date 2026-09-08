@@ -4,9 +4,10 @@ import caseRegistryAbi from "./CaseRegistry.abi.json" with { type: "json" };
 
 export const ChainCaseStatus = {
   None: 0,
-  Opened: 1,
-  Closed: 2,
-  Solved: 3,
+  PendingConsent: 1,
+  Opened: 2,
+  Closed: 3,
+  Solved: 4,
 } as const;
 
 export type ChainCaseStatus = (typeof ChainCaseStatus)[keyof typeof ChainCaseStatus];
@@ -33,15 +34,18 @@ export function stateHash(content: string): string {
 }
 
 /**
- * CaseRegistry client, signing with a single backend-held key.
+ * CaseRegistry client.
  *
- * PROVISIONAL: every write (openCase/closeCase/solveCase) is signed by one
- * server-side key standing in for both A and B. The real design has each
- * party sign their own consent via a Privy wallet — deferred to the bonus
- * phase (see the project's Desarrollo 004 build order). Until then, this
- * client is the only thing allowed to call state-changing functions on the
- * deployed contract; the contract's own `backendSigner` guard enforces that
- * on-chain too.
+ * Opening a case requires two calls to consentToOpen — one per party. Each
+ * call relays that party's off-chain ECDSA signature (personal_sign over
+ * keccak256(caseId ++ stateHash)) as a meta-transaction: the backend signs
+ * the Ethereum tx, but the consent is verified on-chain against the party's
+ * key. The contract moves None → PendingConsent on the first call, and
+ * PendingConsent → Opened on the second.
+ *
+ * PROVISIONAL: closeCase and solveCase are still signed by a single
+ * server-side key standing in for both parties — deferred to the bonus phase.
+ * The contract's `backendSigner` guard enforces this on-chain.
  */
 export class CaseRegistryClient {
   private readonly contract: Contract;
@@ -52,8 +56,12 @@ export class CaseRegistryClient {
     this.contract = new Contract(contractAddress, caseRegistryAbi, wallet);
   }
 
-  async openCase(caseId: string, content: string): Promise<void> {
-    const tx = await this.contract.openCase(caseIdHash(caseId), stateHash(content));
+  async consentToOpen(caseId: string, content: string, signature: string): Promise<void> {
+    const tx = await this.contract.consentToOpen(
+      caseIdHash(caseId),
+      stateHash(content),
+      signature,
+    );
     await tx.wait();
   }
 
@@ -92,8 +100,7 @@ export function getCaseRegistryClient(): CaseRegistryClient {
   if (!rpcUrl || !privateKey || !contractAddress) {
     throw new Error(
       "Missing CaseRegistry config: set CASE_REGISTRY_RPC_URL, " +
-        "CASE_REGISTRY_BACKEND_PRIVATE_KEY, and CASE_REGISTRY_CONTRACT_ADDRESS " +
-        "(the contract isn't deployed to Sepolia yet).",
+        "CASE_REGISTRY_BACKEND_PRIVATE_KEY, and CASE_REGISTRY_CONTRACT_ADDRESS.",
     );
   }
 

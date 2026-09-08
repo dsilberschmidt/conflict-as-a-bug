@@ -1,7 +1,7 @@
 import { getCaseRegistryClient } from "./registry.ts";
 
 export interface ChainWriteClient {
-  openCase(caseId: string, content: string): Promise<void>;
+  consentToOpen(caseId: string, content: string, signature: string): Promise<void>;
   closeCase(caseId: string): Promise<void>;
   solveCase(caseId: string): Promise<void>;
 }
@@ -12,15 +12,16 @@ export interface ChainWriteClient {
  * Upstash y el contrato ante una falla on-chain no está implementada.
  */
 
-export async function tryOpenOnChain(
+export async function tryConsentOnChain(
   caseId: string,
-  ciphertext: string,
+  content: string,
+  signature: string,
   getClient: () => ChainWriteClient = getCaseRegistryClient,
 ): Promise<void> {
   try {
-    await getClient().openCase(caseId, ciphertext);
+    await getClient().consentToOpen(caseId, content, signature);
   } catch (err) {
-    console.error(`[chain] openCase failed for caseId "${caseId}":`, err);
+    console.error(`[chain] consentToOpen failed for caseId "${caseId}":`, err);
   }
 }
 

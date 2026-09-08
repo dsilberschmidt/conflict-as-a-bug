@@ -1,36 +1,36 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { tryOpenOnChain, tryCloseOnChain, trySolveOnChain } from "./sync.ts";
+import { tryConsentOnChain, tryCloseOnChain, trySolveOnChain } from "./sync.ts";
 
 function makeFakeClient(overrides = {}) {
   return {
-    async openCase() {},
+    async consentToOpen() {},
     async closeCase() {},
     async solveCase() {},
     ...overrides,
   };
 }
 
-test("tryOpenOnChain calls openCase with caseId and ciphertext", async () => {
+test("tryConsentOnChain calls consentToOpen with caseId, content, and signature", async () => {
   let called = null;
   const fake = makeFakeClient({
-    async openCase(caseId, content) { called = { caseId, content }; },
+    async consentToOpen(caseId, content, signature) { called = { caseId, content, signature }; },
   });
-  await tryOpenOnChain("case-1", "ciphertext-abc", () => fake);
-  assert.deepEqual(called, { caseId: "case-1", content: "ciphertext-abc" });
+  await tryConsentOnChain("case-1", "ciphertext-abc", "0xsig", () => fake);
+  assert.deepEqual(called, { caseId: "case-1", content: "ciphertext-abc", signature: "0xsig" });
 });
 
-test("tryOpenOnChain does not throw if openCase fails", async () => {
+test("tryConsentOnChain does not throw if consentToOpen fails", async () => {
   const fake = makeFakeClient({
-    async openCase() { throw new Error("network error"); },
+    async consentToOpen() { throw new Error("network error"); },
   });
-  await assert.doesNotReject(() => tryOpenOnChain("case-1", "ciphertext-abc", () => fake));
+  await assert.doesNotReject(() => tryConsentOnChain("case-1", "ciphertext-abc", "0xsig", () => fake));
 });
 
-test("tryOpenOnChain does not throw if getClient fails (missing env vars)", async () => {
+test("tryConsentOnChain does not throw if getClient fails (missing env vars)", async () => {
   await assert.doesNotReject(() =>
-    tryOpenOnChain("case-1", "ciphertext-abc", () => {
+    tryConsentOnChain("case-1", "ciphertext-abc", "0xsig", () => {
       throw new Error("Missing CaseRegistry config");
     }),
   );
