@@ -24,7 +24,7 @@ Una versión redactada puede pasar a semipública o pública solamente con conse
 
 ## Implementación actual
 
-La interfaz está implementada con Next.js. `web/src/app/page.tsx` permite a A redactar `How I see it`, revisar la invitación y generar el enlace cifrado. `web/src/app/invite/page.tsx` implementa la ruta estática `/invite`: descifra la cápsula, presenta la perspectiva de A, permite que B escriba la propia y genere el enlace de respuesta, y luego guía a cada persona a parafrasear a la otra, confirmar o pedir aclaración, hasta que ambas confirmen la comprensión mutua.
+La interfaz está implementada con Next.js. `web/src/app/page.tsx` permite a A redactar `How I see it`, revisar la invitación y generar el enlace cifrado. `web/src/app/invite/page.tsx` implementa la ruta estática `/invite`: descifra la cápsula, presenta la perspectiva de A, permite que B escriba la propia y genere el enlace de respuesta, y luego guía a cada persona a parafrasear a la otra, confirmar o pedir aclaración, hasta que ambas confirmen la comprensión mutua. Cuando se alcanza la comprensión confirmada, `/invite` muestra el botón "Open to solvers" que abre el caso a la comunidad en un solo click (ver sección Resumen automático).
 
 `web/src/lib/invitations/crypto.ts` implementa cifrado local independiente de React y Next.js mediante la Web Crypto API y AES-256-GCM. El tipo central `Invitation` tiene cinco campos: `schemaVersion`, `caseId`, `revision`, `perspectives` (`inviter: string`, `invitee?: string`) y `paraphrases` (`inviter?: Paraphrase`, `invitee?: Paraphrase`). `Paraphrase` contiene `text`, `status` (`"pending" | "clarificationRequested" | "accepted"`) y `clarification?`; `Participant` es el tipo unión `"inviter" | "invitee"`. Cada invitación recibe una clave aleatoria de 256 bits y cada cifrado un IV aleatorio de 96 bits. El sobre de cifrado (`EncryptedInvitationEnvelope`) conserva solo `version`, `algorithm`, `iv` y `ciphertext`; `iv` y `ciphertext` viajan codificados como base64url.
 
@@ -57,12 +57,13 @@ nombre del store en el medio — en lugar de `UPSTASH_REDIS_REST_URL` /
 `UPSTASH_REDIS_REST_TOKEN` que sugiere la documentación genérica de Upstash.
 `createRedisClient()` acepta los tres variantes de nombres como alias.
 
-Dos simplificaciones marcadas como PROVISIONAL en el código:
+Una simplificación marcada como PROVISIONAL en el código:
 
 - Las transiciones on-chain las firma un único `backendSigner` del backend (en lugar
   del consentimiento por parte vía Privy — deferred to bonus phase).
-- El resumen se producirá mediante llamada a IA externa directa, sin Chainlink CRE
-  (deferred to bonus phase).
+
+El resumen se genera mediante llamada directa a Claude Haiku — implementado en
+Fase 5. Chainlink CRE queda para la fase bonus.
 
 ## Vitrina pública y aportes de solvers
 
@@ -89,22 +90,48 @@ funciones de `crypto.ts` (4 escenarios: roommates, coworkers, hermanos,
 cofundadores) y publica cada caso vía `POST /api/cases`. Apuntable a producción
 con `BASE_URL=https://conflict-as-a-bug.vercel.app`.
 
+`web/src/app/showcase/[caseId]/summary-poller.tsx` (client component) corre un
+`setInterval` de 3 segundos que llama a `router.refresh()` hasta 10 veces
+mientras el caso no tiene summary. El Server Component deja de renderizarlo en
+cuanto el summary aparece, lo que cancela el interval vía el cleanup del
+`useEffect`. El indicador visible es "Generating summary…" con `animate-pulse`.
+
+`web/scripts/test-summary-poller.sh` es un smoke test manual que crea un caso,
+abre el navegador en su página de detalle, espera 5 segundos y dispara la
+generación del resumen — permite observar el comportamiento del poller sin
+competir a mano contra el timing. Parametrizable con `BASE_URL`.
+
+## Resumen automático (Fase 5)
+
+`web/src/lib/ai/summarize.ts` llama a Claude Haiku
+(`claude-haiku-4-5-20251001`) vía `@anthropic-ai/sdk` con un prompt de
+anonimización: describe la situación y cada perspectiva en términos neutrales,
+sin identificar a las partes por nombre o rol, en un párrafo de hasta 300
+tokens. El SDK lee `ANTHROPIC_API_KEY` del entorno automáticamente.
+
+`POST /api/cases/[caseId]/summary/generate` recibe `{ text: string }` (el
+texto plano de las 4 perspectivas/paráfrasis), llama a `generateSummary` y
+guarda el resultado con `caseStore.setSummary`. Es idempotente: si el caso ya
+tiene summary lo devuelve directamente sin volver a llamar a la IA, evitando
+abuso dado que los caseId son públicos.
+
+El botón "Open to solvers" en `/invite` (visible solo cuando
+`isMutualUnderstandingConfirmed` es `true`) encadena en un solo click: armar el
+texto plano de las 4 perspectivas/paráfrasis, cifrar la invitación de nuevo
+(envelope fresco, `decryptionKey` descartada), `POST /api/cases`, y disparar
+`POST /api/cases/[caseId]/summary/generate` como fire-and-forget antes de
+redirigir a `/showcase/[caseId]` con `router.push`.
+
 ## Límite actual
 
-El flujo end-to-end completo está desplegado en producción
-(`https://conflict-as-a-bug.vercel.app`).
+Las 5 fases del camino mínimo están completas y verificadas en producción
+(`https://conflict-as-a-bug.vercel.app`) con un flujo real de usuario: A y B
+completan el intercambio privado en `/invite` hasta comprensión mutua
+confirmada, abren el caso a solvers con un click, el resumen aparece solo en la
+vitrina, y cualquier persona puede dejar un aporte desde `/showcase/[caseId]`.
 
 La fase privada entre A y B sigue sin persistencia server-side, por diseño: el
 estado viaja cifrado en las URLs y el servidor no almacena el caso.
-
-La fase de apertura a solvers está completa con interfaz pública: `/showcase`
-lista los casos abiertos, `/showcase/[caseId]` muestra el resumen y los aportes
-recibidos, y cualquier persona puede contribuir con texto libre mientras el caso
-esté abierto. El wiring con Upstash y Sepolia está verificado end-to-end en
-producción.
-
-Pendiente: resumen generado por IA (actualmente "Summary pending") — Fase 5,
-en curso hoy.
 
 Pendiente para la fase bonus: firma de transiciones on-chain por parte (Privy)
 y lectura del listado de casos desde el contrato en lugar del backend.
@@ -124,6 +151,8 @@ npm run test:chain-sync   # 7/7 (helpers on-chain con fakes, desde web/)
 npm run test:offline      # 13/13 (solc local, sin red)
 # poblar vitrina (requiere Next.js corriendo o BASE_URL a producción):
 node web/scripts/seed-cases.mjs
+# smoke test manual del SummaryPoller:
+./web/scripts/test-summary-poller.sh
 ```
 
 ## Flujo de trabajo

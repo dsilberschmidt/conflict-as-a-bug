@@ -45,6 +45,29 @@
   limpia el textarea y llama a `router.refresh()` para que la lista de aportes
   se actualice desde el servidor sin duplicar lógica de render en el cliente.
   Las tarjetas de la vitrina son ahora enlaces a la página de detalle.
+- **8 de septiembre de 2026 — Fase 5: resumen automático y botón "Open to
+  solvers":** `web/src/lib/ai/summarize.ts` encapsula la llamada a Claude Haiku
+  (`claude-haiku-4-5-20251001`) vía `@anthropic-ai/sdk`; lee `ANTHROPIC_API_KEY`
+  del entorno, genera hasta 300 tokens con un prompt de anonimización (describe
+  la situación y cada perspectiva en términos neutrales, sin identificar a las
+  partes). `POST /api/cases/[caseId]/summary/generate` es idempotente: si el
+  caso ya tiene summary lo devuelve directo sin volver a llamar a la IA — evita
+  abuso dado que los caseId son públicos. En `/invite`, cuando
+  `isMutualUnderstandingConfirmed` es `true`, aparece el botón "Open to solvers"
+  que en un solo click arma el texto plano de las 4 perspectivas/paráfrasis,
+  crea el caso vía `POST /api/cases` con una encriptación nueva generada en el
+  momento (el `decryptionKey` se descarta), dispara la generación del resumen
+  sin bloquear el redirect (fire-and-forget), y redirige a `/showcase/[caseId]`.
+  `web/src/app/showcase/[caseId]/summary-poller.tsx` (client component) hace
+  `router.refresh()` cada 3 segundos hasta 10 intentos mientras el caso no tiene
+  summary; muestra "Generating summary…" con `animate-pulse` como indicador de
+  actividad — sin esto la espera parecía colgada. `web/scripts/test-summary-poller.sh`
+  es un smoke test manual (no automatizado) que crea un caso, abre el navegador
+  en su página de detalle, espera 5 segundos y dispara el resumen, para observar
+  el poller en vivo sin competir a mano contra el timing. Verificado end-to-end
+  en producción con un flujo real de usuario: A y B completando el intercambio
+  en `/invite` hasta comprensión mutua confirmada → click en "Open to solvers"
+  → resumen generado apareciendo solo en la vitrina.
 - **7 de septiembre de 2026 — backend de casos y contrato (sin desplegar):**
   `web/src/lib/cases/` implementa persistencia server-side en Upstash Redis
   (`@upstash/redis`): fábrica `createCaseStore` con interfaz `KvClient` inyectable
@@ -72,10 +95,9 @@
 - La apertura de un caso a solvers persiste en el servidor (Upstash Redis). La fase
   privada A/B sigue sin persistencia server-side por diseño.
 - Las transiciones on-chain las firma un único signer del backend (PROVISIONAL, en
-  lugar de consentimiento por parte vía Privy). El resumen se producirá mediante
-  llamada a IA externa directa (PROVISIONAL, sin Chainlink CRE). Ambas
-  simplificaciones están marcadas en el código; Privy y Chainlink quedan para la fase
-  bonus si hay tiempo.
+  lugar de consentimiento por parte vía Privy — deferred to bonus phase). El resumen
+  se genera mediante llamada directa a Claude Haiku vía `@anthropic-ai/sdk`,
+  implementado en Fase 5. Chainlink CRE queda para la fase bonus.
 - La integración de Vercel Marketplace para Upstash inyecta
   `UPSTASH_REDIS_KV_REST_API_URL` / `UPSTASH_REDIS_KV_REST_API_TOKEN` (con el
   nombre del store en el medio), no `UPSTASH_REDIS_REST_URL` /
@@ -100,6 +122,11 @@
 - `web/scripts/seed-cases.mjs` pobla la vitrina con 4 escenarios reales
   apuntando a `BASE_URL` (default: localhost; producción con
   `BASE_URL=https://conflict-as-a-bug.vercel.app`).
+- Flujo de usuario real verificado end-to-end en producción: comprensión mutua
+  confirmada en `/invite` → "Open to solvers" → caso en vitrina con resumen
+  generado por IA → aporte de solver desde `/showcase/[caseId]`.
+- `web/scripts/test-summary-poller.sh` permite observar el SummaryPoller en vivo
+  apuntando a localhost o producción vía `BASE_URL`.
 
 ## Próximas entradas
 
