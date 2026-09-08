@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { PrivyClientProvider } from "@/lib/privy/PrivyClientProvider";
 
 export const metadata: Metadata = {
   title: "Conflict as a Bug",
@@ -9,7 +10,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <PrivyClientProvider>{children}</PrivyClientProvider>
+      </body>
     </html>
   );
 }
