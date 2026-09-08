@@ -10,6 +10,7 @@ import {
   encryptInvitation,
   isMutualUnderstandingConfirmed,
   reviewParaphrase,
+  setOpenEnvelope,
   submitParaphrase,
 } from "./crypto.ts";
 
@@ -174,4 +175,34 @@ test("addConsent throws if the same participant consents twice", () => {
     () => addConsent(withConsent, "inviter", { address: "0xAAA", signature: "0xsig2" }),
     /inviter/,
   );
+});
+
+test("setOpenEnvelope stores the envelope and prevents overwriting", async () => {
+  const invitation = addInviteePerspective(
+    createInitialInvitation("A's perspective"),
+    "B's perspective",
+  );
+  const { envelope } = await encryptInvitation(invitation);
+  const withEnvelope = setOpenEnvelope(invitation, envelope);
+
+  assert.deepEqual(withEnvelope.openEnvelope, envelope);
+  assert.equal(withEnvelope.revision, invitation.revision + 1);
+  assert.throws(
+    () => setOpenEnvelope(withEnvelope, envelope),
+    /openEnvelope already set/,
+  );
+});
+
+test("setOpenEnvelope survives encrypt/decrypt round-trip", async () => {
+  const base = addInviteePerspective(
+    createInitialInvitation("A's perspective"),
+    "B's perspective",
+  );
+  const { envelope } = await encryptInvitation(base);
+  const withEnvelope = setOpenEnvelope(base, envelope);
+  const { envelope: outerEnvelope, decryptionKey } = await encryptInvitation(withEnvelope);
+  const decrypted = await decryptInvitation(outerEnvelope, decryptionKey);
+
+  assert.deepEqual(decrypted.openEnvelope, envelope);
+  assert.equal(decrypted.revision, withEnvelope.revision);
 });

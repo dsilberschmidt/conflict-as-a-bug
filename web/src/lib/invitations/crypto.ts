@@ -38,6 +38,7 @@ export interface Invitation {
     inviter?: Consent;
     invitee?: Consent;
   };
+  openEnvelope?: EncryptedInvitationEnvelope;
 }
 
 export interface EncryptedInvitationEnvelope {
@@ -167,12 +168,23 @@ function isConsentsState(value: unknown): value is Invitation["consents"] {
   );
 }
 
+function isEncryptedInvitationEnvelope(value: unknown): value is EncryptedInvitationEnvelope {
+  try {
+    assertEnvelope(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function isInvitation(value: unknown): value is Invitation {
   if (
     !isRecord(value) ||
     (
       !hasExpectedFields(value, ["schemaVersion", "caseId", "revision", "perspectives", "paraphrases"]) &&
-      !hasExpectedFields(value, ["schemaVersion", "caseId", "revision", "perspectives", "paraphrases", "consents"])
+      !hasExpectedFields(value, ["schemaVersion", "caseId", "revision", "perspectives", "paraphrases", "consents"]) &&
+      !hasExpectedFields(value, ["schemaVersion", "caseId", "revision", "perspectives", "paraphrases", "openEnvelope"]) &&
+      !hasExpectedFields(value, ["schemaVersion", "caseId", "revision", "perspectives", "paraphrases", "consents", "openEnvelope"])
     )
   ) {
     return false;
@@ -198,6 +210,10 @@ function isInvitation(value: unknown): value is Invitation {
   }
 
   if (Object.hasOwn(value, "consents") && !isConsentsState(value.consents)) {
+    return false;
+  }
+
+  if (Object.hasOwn(value, "openEnvelope") && !isEncryptedInvitationEnvelope(value.openEnvelope)) {
     return false;
   }
 
@@ -369,6 +385,26 @@ export function bothConsented(invitation: Invitation): boolean {
     invitation.consents?.inviter !== undefined &&
     invitation.consents?.invitee !== undefined
   );
+}
+
+/** Stores the fixed envelope that both parties will sign to open the case.
+ *  Can only be set once — the first signer generates it; the second cannot
+ *  overwrite it. */
+export function setOpenEnvelope(
+  invitation: Invitation,
+  envelope: EncryptedInvitationEnvelope,
+): Invitation {
+  if (!isInvitation(invitation) || !isEncryptedInvitationEnvelope(envelope)) {
+    throw new TypeError("Invalid invitation state");
+  }
+  if (invitation.openEnvelope !== undefined) {
+    throw new Error("openEnvelope already set — cannot overwrite");
+  }
+  return {
+    ...invitation,
+    revision: nextRevision(invitation),
+    openEnvelope: envelope,
+  };
 }
 
 function assertEnvelope(envelope: unknown): asserts envelope is EncryptedInvitationEnvelope {
