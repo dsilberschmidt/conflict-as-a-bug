@@ -34,10 +34,7 @@ export interface Invitation {
     inviter?: Paraphrase;
     invitee?: Paraphrase;
   };
-  consents?: {
-    inviter?: Consent;
-    invitee?: Consent;
-  };
+  consents?: Consent[];
   openEnvelope?: EncryptedInvitationEnvelope;
 }
 
@@ -160,12 +157,10 @@ function isParaphraseState(value: unknown): value is Invitation["paraphrases"] {
 }
 
 function isConsentsState(value: unknown): value is Invitation["consents"] {
-  if (!isRecord(value)) return false;
-  return (
-    Reflect.ownKeys(value).every((field) => isParticipant(field)) &&
-    (!Object.hasOwn(value, "inviter") || isConsent(value.inviter)) &&
-    (!Object.hasOwn(value, "invitee") || isConsent(value.invitee))
-  );
+  if (!Array.isArray(value) || value.length > 2) return false;
+  if (!value.every(isConsent)) return false;
+  const addresses = value.map((c) => (c as Consent).address);
+  return new Set(addresses).size === addresses.length;
 }
 
 function isEncryptedInvitationEnvelope(value: unknown): value is EncryptedInvitationEnvelope {
@@ -355,36 +350,29 @@ export function isMutualUnderstandingConfirmed(invitation: Invitation): boolean 
   );
 }
 
-/** Records a party's consent to open the case. Each participant can consent
- *  at most once — attempting to overwrite throws. */
-export function addConsent(
-  invitation: Invitation,
-  participant: Participant,
-  consent: Consent,
-): Invitation {
-  if (!isInvitation(invitation) || !isParticipant(participant) || !isConsent(consent)) {
+/** Records a party's consent to open the case. At most two consents allowed;
+ *  the same address cannot consent twice. */
+export function addConsent(invitation: Invitation, consent: Consent): Invitation {
+  if (!isInvitation(invitation) || !isConsent(consent)) {
     throw new TypeError("Invalid invitation state");
   }
-  if (invitation.consents?.[participant] !== undefined) {
-    throw new Error(`Consent already recorded for ${participant}`);
+  const existing = invitation.consents ?? [];
+  if (existing.length >= 2) {
+    throw new Error("Cannot add more than two consents");
+  }
+  if (existing.some((c) => c.address === consent.address)) {
+    throw new Error(`Address ${consent.address} has already consented`);
   }
   return {
     ...invitation,
     revision: nextRevision(invitation),
-    consents: {
-      ...invitation.consents,
-      [participant]: consent,
-    },
+    consents: [...existing, consent],
   };
 }
 
-/** Returns true only when both inviter and invitee have recorded a consent. */
+/** Returns true only when two distinct addresses have recorded a consent. */
 export function bothConsented(invitation: Invitation): boolean {
-  return (
-    isInvitation(invitation) &&
-    invitation.consents?.inviter !== undefined &&
-    invitation.consents?.invitee !== undefined
-  );
+  return isInvitation(invitation) && (invitation.consents?.length ?? 0) === 2;
 }
 
 /** Stores the fixed envelope that both parties will sign to open the case.

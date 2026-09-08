@@ -138,10 +138,9 @@ test("addConsent records one consent and bothConsented returns false", () => {
     "B's perspective",
   );
   const consent = { address: "0xAAA", signature: "0xsig1" };
-  const withConsent = addConsent(invitation, "inviter", consent);
+  const withConsent = addConsent(invitation, consent);
 
-  assert.deepEqual(withConsent.consents?.inviter, consent);
-  assert.equal(withConsent.consents?.invitee, undefined);
+  assert.deepEqual(withConsent.consents, [consent]);
   assert.equal(bothConsented(withConsent), false);
 });
 
@@ -152,28 +151,23 @@ test("addConsent records both consents and bothConsented returns true", () => {
   );
   const consentA = { address: "0xAAA", signature: "0xsig1" };
   const consentB = { address: "0xBBB", signature: "0xsig2" };
-  const withBoth = addConsent(
-    addConsent(invitation, "inviter", consentA),
-    "invitee",
-    consentB,
-  );
+  const withBoth = addConsent(addConsent(invitation, consentA), consentB);
 
   assert.equal(bothConsented(withBoth), true);
-  assert.deepEqual(withBoth.consents?.inviter, consentA);
-  assert.deepEqual(withBoth.consents?.invitee, consentB);
+  assert.deepEqual(withBoth.consents, [consentA, consentB]);
 });
 
-test("addConsent throws if the same participant consents twice", () => {
+test("addConsent throws if the same address consents twice", () => {
   const invitation = addInviteePerspective(
     createInitialInvitation("A's perspective"),
     "B's perspective",
   );
   const consent = { address: "0xAAA", signature: "0xsig1" };
-  const withConsent = addConsent(invitation, "inviter", consent);
+  const withConsent = addConsent(invitation, consent);
 
   assert.throws(
-    () => addConsent(withConsent, "inviter", { address: "0xAAA", signature: "0xsig2" }),
-    /inviter/,
+    () => addConsent(withConsent, { address: "0xAAA", signature: "0xsig2" }),
+    /0xAAA/,
   );
 });
 
