@@ -64,17 +64,50 @@ Dos simplificaciones marcadas como PROVISIONAL en el código:
 - El resumen se producirá mediante llamada a IA externa directa, sin Chainlink CRE
   (deferred to bonus phase).
 
+## Vitrina pública y aportes de solvers
+
+`web/src/app/showcase/page.tsx` es un Server Component con
+`export const dynamic = "force-dynamic"` que lista todos los casos con estado
+`opened`, ordenados por fecha de creación descendente mediante
+`sortCasesByCreatedAt` exportado desde `public-view.ts`. Cada tarjeta enlaza a
+la página de detalle correspondiente.
+
+`web/src/app/showcase/[caseId]/page.tsx` (Server Component, también
+`force-dynamic`) muestra el resumen del caso, la lista de aportes recibidos en
+orden cronológico y el componente `ContributionForm`. Solo expone lo que
+devuelve `toPublicCase()` más los aportes — el historial cifrado nunca llega
+al cliente.
+
+`web/src/app/showcase/[caseId]/contribution-form.tsx` (client component) es un
+formulario de texto libre que hace `POST` a
+`/api/cases/[caseId]/contributions`. Si el caso no está en estado `opened`,
+muestra un aviso y no permite enviar. En éxito llama a `router.refresh()` para
+refrescar los datos desde el servidor.
+
+`web/scripts/seed-cases.mjs` simula el flujo privado completo de A/B con las
+funciones de `crypto.ts` (4 escenarios: roommates, coworkers, hermanos,
+cofundadores) y publica cada caso vía `POST /api/cases`. Apuntable a producción
+con `BASE_URL=https://conflict-as-a-bug.vercel.app`.
+
 ## Límite actual
 
-El flujo end-to-end está conectado y desplegado en producción (`https://conflict-as-a-bug.vercel.app`).
+El flujo end-to-end completo está desplegado en producción
+(`https://conflict-as-a-bug.vercel.app`).
 
 La fase privada entre A y B sigue sin persistencia server-side, por diseño: el
 estado viaja cifrado en las URLs y el servidor no almacena el caso.
 
-La fase de apertura a solvers tiene persistencia server-side en Upstash Redis y
-registra cada transición de estado en el contrato desplegado en Sepolia. El wiring
-está verificado end-to-end en producción: `POST /api/cases` persiste en Upstash y
-emite `openCase` en Sepolia en la misma llamada.
+La fase de apertura a solvers está completa con interfaz pública: `/showcase`
+lista los casos abiertos, `/showcase/[caseId]` muestra el resumen y los aportes
+recibidos, y cualquier persona puede contribuir con texto libre mientras el caso
+esté abierto. El wiring con Upstash y Sepolia está verificado end-to-end en
+producción.
+
+Pendiente: resumen generado por IA (actualmente "Summary pending") — Fase 5,
+en curso hoy.
+
+Pendiente para la fase bonus: firma de transiciones on-chain por parte (Privy)
+y lectura del listado de casos desde el contrato en lugar del backend.
 
 ## Verificación para continuidad
 
@@ -83,12 +116,14 @@ Desde `web/`:
 ```sh
 npm run lint        # sin warnings
 npm run test:crypto # 7/7
-npm run build       # compila / e /invite como estáticas
+npm run build       # / e /invite estáticas; /showcase y /showcase/[caseId] como ƒ (Dynamic)
 node --test src/lib/invitations/link.test.mjs  # 4/4; aún sin script en package.json
 npm run test:cases        # 7/7 (store con fake in-memory, desde web/)
 npm run test:chain-sync   # 7/7 (helpers on-chain con fakes, desde web/)
 # desde contracts/:
 npm run test:offline      # 13/13 (solc local, sin red)
+# poblar vitrina (requiere Next.js corriendo o BASE_URL a producción):
+node web/scripts/seed-cases.mjs
 ```
 
 ## Flujo de trabajo

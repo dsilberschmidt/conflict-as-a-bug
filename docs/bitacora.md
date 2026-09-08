@@ -24,6 +24,27 @@
   real `openCase` confirmada en Sepolia Etherscan contra el contrato
   `0x3a53Ec28B5DD9c253C893eE1354083Bad3Cea98A`. El wiring Upstash ↔ contrato
   funciona en producción. Cierra la Fase 2 del roadmap.
+- **8 de septiembre de 2026 — Fase 3: vitrina pública de casos abiertos:**
+  `web/src/app/showcase/page.tsx` es un Server Component que lee `caseStore`
+  directamente y lista todos los casos con estado `opened`. Los casos se ordenan
+  por fecha de creación descendente mediante `sortCasesByCreatedAt` exportado
+  desde `public-view.ts`. Requiere `export const dynamic = "force-dynamic"`
+  porque Next.js intenta prerenderizar en build time si no se lo indica
+  explícitamente — falla sin credenciales de Upstash y produciría datos
+  desactualizados incluso si las hubiera. `web/scripts/seed-cases.mjs` simula
+  el flujo privado completo de A/B con las funciones de `crypto.ts` (4
+  escenarios: roommates, coworkers, hermanos, cofundadores) y llama a
+  `POST /api/cases` para cada uno; apuntable a producción vía `BASE_URL`.
+- **8 de septiembre de 2026 — Fase 4: página de detalle de caso y formulario
+  de aportes:** `web/src/app/showcase/[caseId]/page.tsx` (Server Component,
+  `export const dynamic = "force-dynamic"`) muestra el resumen del caso y la
+  lista de aportes recibidos en orden cronológico (lista de Redis, ya ordenada).
+  `web/src/app/showcase/[caseId]/contribution-form.tsx` (client component)
+  expone un textarea que hace `POST` a `/api/cases/[caseId]/contributions`; se
+  deshabilita automáticamente si el caso no está en estado `opened`. En éxito,
+  limpia el textarea y llama a `router.refresh()` para que la lista de aportes
+  se actualice desde el servidor sin duplicar lógica de render en el cliente.
+  Las tarjetas de la vitrina son ahora enlaces a la página de detalle.
 - **7 de septiembre de 2026 — backend de casos y contrato (sin desplegar):**
   `web/src/lib/cases/` implementa persistencia server-side en Upstash Redis
   (`@upstash/redis`): fábrica `createCaseStore` con interfaz `KvClient` inyectable
@@ -75,6 +96,10 @@
   con fakes; pasa sin red.
 - `POST /api/cases` en producción emite `openCase` en Sepolia y devuelve 201;
   verificado en Sepolia Etherscan.
+- `/showcase` y `/showcase/[caseId]` aparecen como ƒ (Dynamic) en el build.
+- `web/scripts/seed-cases.mjs` pobla la vitrina con 4 escenarios reales
+  apuntando a `BASE_URL` (default: localhost; producción con
+  `BASE_URL=https://conflict-as-a-bug.vercel.app`).
 
 ## Próximas entradas
 
