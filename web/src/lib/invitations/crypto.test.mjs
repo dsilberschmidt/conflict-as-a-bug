@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  addConsent,
   addInviteePerspective,
+  bothConsented,
   createInitialInvitation,
   decryptInvitation,
   encryptInvitation,
@@ -126,5 +128,50 @@ test("rejects malformed envelopes with controlled errors", async () => {
   await assert.rejects(
     decryptInvitation({ ...envelope, key: decryptionKey }, decryptionKey),
     /Invalid invitation encryption envelope/,
+  );
+});
+
+test("addConsent records one consent and bothConsented returns false", () => {
+  const invitation = addInviteePerspective(
+    createInitialInvitation("A's perspective"),
+    "B's perspective",
+  );
+  const consent = { address: "0xAAA", signature: "0xsig1" };
+  const withConsent = addConsent(invitation, "inviter", consent);
+
+  assert.deepEqual(withConsent.consents?.inviter, consent);
+  assert.equal(withConsent.consents?.invitee, undefined);
+  assert.equal(bothConsented(withConsent), false);
+});
+
+test("addConsent records both consents and bothConsented returns true", () => {
+  const invitation = addInviteePerspective(
+    createInitialInvitation("A's perspective"),
+    "B's perspective",
+  );
+  const consentA = { address: "0xAAA", signature: "0xsig1" };
+  const consentB = { address: "0xBBB", signature: "0xsig2" };
+  const withBoth = addConsent(
+    addConsent(invitation, "inviter", consentA),
+    "invitee",
+    consentB,
+  );
+
+  assert.equal(bothConsented(withBoth), true);
+  assert.deepEqual(withBoth.consents?.inviter, consentA);
+  assert.deepEqual(withBoth.consents?.invitee, consentB);
+});
+
+test("addConsent throws if the same participant consents twice", () => {
+  const invitation = addInviteePerspective(
+    createInitialInvitation("A's perspective"),
+    "B's perspective",
+  );
+  const consent = { address: "0xAAA", signature: "0xsig1" };
+  const withConsent = addConsent(invitation, "inviter", consent);
+
+  assert.throws(
+    () => addConsent(withConsent, "inviter", { address: "0xAAA", signature: "0xsig2" }),
+    /inviter/,
   );
 });

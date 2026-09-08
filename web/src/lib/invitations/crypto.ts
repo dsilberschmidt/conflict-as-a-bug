@@ -17,6 +17,11 @@ export interface Paraphrase {
   clarification?: string;
 }
 
+export interface Consent {
+  address: string;
+  signature: string;
+}
+
 export interface Invitation {
   schemaVersion: typeof INVITATION_SCHEMA_VERSION;
   caseId: string;
@@ -28,6 +33,10 @@ export interface Invitation {
   paraphrases: {
     inviter?: Paraphrase;
     invitee?: Paraphrase;
+  };
+  consents?: {
+    inviter?: Consent;
+    invitee?: Consent;
   };
 }
 
@@ -128,6 +137,15 @@ function isParaphrase(value: unknown): value is Paraphrase {
   );
 }
 
+function isConsent(value: unknown): value is Consent {
+  return (
+    isRecord(value) &&
+    hasExpectedFields(value, ["address", "signature"]) &&
+    typeof value.address === "string" &&
+    typeof value.signature === "string"
+  );
+}
+
 function isParaphraseState(value: unknown): value is Invitation["paraphrases"] {
   if (!isRecord(value)) {
     return false;
@@ -140,8 +158,23 @@ function isParaphraseState(value: unknown): value is Invitation["paraphrases"] {
   );
 }
 
+function isConsentsState(value: unknown): value is Invitation["consents"] {
+  if (!isRecord(value)) return false;
+  return (
+    Reflect.ownKeys(value).every((field) => isParticipant(field)) &&
+    (!Object.hasOwn(value, "inviter") || isConsent(value.inviter)) &&
+    (!Object.hasOwn(value, "invitee") || isConsent(value.invitee))
+  );
+}
+
 function isInvitation(value: unknown): value is Invitation {
-  if (!isRecord(value) || !hasExpectedFields(value, ["schemaVersion", "caseId", "revision", "perspectives", "paraphrases"])) {
+  if (
+    !isRecord(value) ||
+    (
+      !hasExpectedFields(value, ["schemaVersion", "caseId", "revision", "perspectives", "paraphrases"]) &&
+      !hasExpectedFields(value, ["schemaVersion", "caseId", "revision", "perspectives", "paraphrases", "consents"])
+    )
+  ) {
     return false;
   }
 
@@ -161,6 +194,10 @@ function isInvitation(value: unknown): value is Invitation {
     (Object.hasOwn(value.perspectives, "invitee") && typeof value.perspectives.invitee !== "string") ||
     !isParaphraseState(value.paraphrases)
   ) {
+    return false;
+  }
+
+  if (Object.hasOwn(value, "consents") && !isConsentsState(value.consents)) {
     return false;
   }
 
@@ -299,6 +336,38 @@ export function isMutualUnderstandingConfirmed(invitation: Invitation): boolean 
     isInvitation(invitation) &&
     invitation.paraphrases.inviter?.status === "accepted" &&
     invitation.paraphrases.invitee?.status === "accepted"
+  );
+}
+
+/** Records a party's consent to open the case. Each participant can consent
+ *  at most once — attempting to overwrite throws. */
+export function addConsent(
+  invitation: Invitation,
+  participant: Participant,
+  consent: Consent,
+): Invitation {
+  if (!isInvitation(invitation) || !isParticipant(participant) || !isConsent(consent)) {
+    throw new TypeError("Invalid invitation state");
+  }
+  if (invitation.consents?.[participant] !== undefined) {
+    throw new Error(`Consent already recorded for ${participant}`);
+  }
+  return {
+    ...invitation,
+    revision: nextRevision(invitation),
+    consents: {
+      ...invitation.consents,
+      [participant]: consent,
+    },
+  };
+}
+
+/** Returns true only when both inviter and invitee have recorded a consent. */
+export function bothConsented(invitation: Invitation): boolean {
+  return (
+    isInvitation(invitation) &&
+    invitation.consents?.inviter !== undefined &&
+    invitation.consents?.invitee !== undefined
   );
 }
 
