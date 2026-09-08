@@ -17,7 +17,7 @@ import {
   type Participant,
 } from "../../lib/invitations/crypto";
 import { createInvitationLink, parseInvitationLink } from "../../lib/invitations/link";
-import { useConsentSigner } from "../../lib/privy/useConsentSigner";
+import { ConsentLoginStartedError, useConsentSigner } from "../../lib/privy/useConsentSigner";
 
 type InvitationState =
   | { status: "loading" }
@@ -381,8 +381,12 @@ export default function InvitationPage() {
       }).catch((err) => console.error("[summarize] failed:", err));
 
       router.push(`/showcase/${inv.caseId}`);
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (error) {
+      if (error instanceof ConsentLoginStartedError) {
+        setInfoMessage("After signing in, select the button again to sign your consent.");
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
     } finally {
       setIsCreating(false);
     }

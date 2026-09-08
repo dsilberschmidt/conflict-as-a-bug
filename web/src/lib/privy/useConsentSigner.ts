@@ -14,6 +14,8 @@ function consentMessageHash(caseId: string, content: string): string {
   );
 }
 
+export class ConsentLoginStartedError extends Error {}
+
 export function useConsentSigner() {
   const { authenticated, login } = usePrivy();
   const { wallets } = useWallets();
@@ -21,7 +23,7 @@ export function useConsentSigner() {
   async function signConsentMessage(caseId: string, content: string): Promise<Consent> {
     if (!authenticated) {
       login();
-      throw new Error("Login required — retry after authentication");
+      throw new ConsentLoginStartedError();
     }
 
     const wallet = getEmbeddedConnectedWallet(wallets);
@@ -40,3 +42,4 @@ export function useConsentSigner() {
 
   return { signConsentMessage };
 }
+
