@@ -83,6 +83,23 @@
   externa directa (PROVISIONAL: sin Chainlink CRE). Hardhat 3 con 13 tests pasando;
   contrato no desplegado — requiere RPC URL y clave con fondos en Sepolia.
 
+- **8 de septiembre de 2026 — redeploy del contrato y actualización del cliente
+  on-chain:** `CaseRegistry.sol` redesplegado en Sepolia con soporte para
+  consentimiento de dos partes: nuevo estado `PendingConsent` en el enum, función
+  `consentToOpen` que verifica una firma ECDSA (personal_sign) por parte y mueve
+  el caso None → PendingConsent → Opened en dos llamadas. La tx la paga el backend
+  como meta-transacción (PROVISIONAL: las partes no tienen ETH en sus wallets
+  Privy al momento de creación). Dirección nueva:
+  `0x0a481Eeb5971ab086e3B7A2c22fe9C37f91fEd6c`; la anterior
+  (`0x3a53Ec28B5DD9c253C893eE1354083Bad3Cea98A`) queda obsoleta.
+  `CASE_REGISTRY_CONTRACT_ADDRESS` actualizado en Vercel en el mismo momento del
+  redeploy. ABI regenerado con `npm run dump-abi` y copiado a
+  `web/src/lib/chain/`. `registry.ts` actualizado: `ChainCaseStatus` con los
+  cinco valores nuevos, `openCase` eliminada, `consentToOpen(caseId, content,
+  signature)` agregada. `sync.ts`: `tryOpenOnChain` eliminada,
+  `tryConsentOnChain` exportada (sin wiring en `route.ts` todavía — el cableado
+  espera la firma off-chain desde la UI de Privy). `sync.test.mjs`: 7/7.
+
 ## Decisiones de producto y arquitectura
 
 - El caso v0.1 es privado y limitado a A y B.
@@ -94,10 +111,11 @@
 - La forma concreta de persistir el sobre y distribuir la clave sigue **pendiente**.
 - La apertura de un caso a solvers persiste en el servidor (Upstash Redis). La fase
   privada A/B sigue sin persistencia server-side por diseño.
-- Las transiciones on-chain las firma un único signer del backend (PROVISIONAL, en
-  lugar de consentimiento por parte vía Privy — deferred to bonus phase). El resumen
-  se genera mediante llamada directa a Claude Haiku vía `@anthropic-ai/sdk`,
-  implementado en Fase 5. Chainlink CRE queda para la fase bonus.
+- `consentToOpen` verifica la firma ECDSA de cada parte on-chain; el backend relaya
+  como meta-transacción (PROVISIONAL: gas por parte, deferred). `closeCase` y
+  `solveCase` siguen con un único signer del backend (PROVISIONAL, deferred to bonus
+  phase). El resumen se genera mediante llamada directa a Claude Haiku vía
+  `@anthropic-ai/sdk`, implementado en Fase 5. Chainlink CRE queda para la fase bonus.
 - La integración de Vercel Marketplace para Upstash inyecta
   `UPSTASH_REDIS_KV_REST_API_URL` / `UPSTASH_REDIS_KV_REST_API_TOKEN` (con el
   nombre del store en el medio), no `UPSTASH_REDIS_REST_URL` /
@@ -116,8 +134,9 @@
   `solc` local; pasa sin red.
 - `npm run test:chain-sync` (desde `web/`) corre 7 tests de los helpers on-chain
   con fakes; pasa sin red.
-- `POST /api/cases` en producción emite `openCase` en Sepolia y devuelve 201;
-  verificado en Sepolia Etherscan.
+- `POST /api/cases` crea el caso en Upstash y devuelve 201. El wiring on-chain
+  (`tryConsentOnChain`) está pendiente — exportado en `sync.ts` pero no cableado
+  en la ruta todavía.
 - `/showcase` y `/showcase/[caseId]` aparecen como ƒ (Dynamic) en el build.
 - `web/scripts/seed-cases.mjs` pobla la vitrina con 4 escenarios reales
   apuntando a `BASE_URL` (default: localhost; producción con

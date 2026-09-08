@@ -41,15 +41,22 @@ el primer uso, no al importar). Las operaciones cubren creación de casos, estad
 rutas API bajo `web/src/app/api/cases/` exponen estas operaciones.
 
 `web/src/lib/chain/registry.ts` implementa `CaseRegistryClient` (ethers v6):
-convierte el `caseId` string a `bytes32` vía `keccak256` y llama `openCase`,
-`closeCase` y `solveCase` en el contrato. `getCaseRegistryClient()` lanza si las
-variables de entorno (`CASE_REGISTRY_RPC_URL`, `CASE_REGISTRY_BACKEND_PRIVATE_KEY`,
+convierte el `caseId` string a `bytes32` vía `keccak256`. Para abrir un caso
+expone `consentToOpen(caseId, content, signature)`: meta-transacción en la que el
+backend firma la tx en Ethereum, pero el consentimiento se verifica on-chain contra
+la clave de la parte (firma ECDSA personal_sign off-chain). Se requieren dos
+llamadas, una por parte (None → PendingConsent → Opened). `closeCase` y `solveCase`
+siguen firmados por la clave única del backend (PROVISIONAL). `sync.ts` expone
+`tryConsentOnChain` con el mismo patrón fire-and-forget de `tryCloseOnChain` /
+`trySolveOnChain` — exportada, pendiente de wiring en la ruta POST /api/cases.
+`getCaseRegistryClient()` lanza si las variables de entorno
+(`CASE_REGISTRY_RPC_URL`, `CASE_REGISTRY_BACKEND_PRIVATE_KEY`,
 `CASE_REGISTRY_CONTRACT_ADDRESS`) no están definidas.
 
 `contracts/CaseRegistry.sol` es el registro on-chain: guarda un hash de estado y un
-enum (`None / Opened / Closed / Solved`) por `caseId`; no almacena contenido. Hardhat
-3 con 13 tests pasando. Desplegado en Sepolia:
-`0x3a53Ec28B5DD9c253C893eE1354083Bad3Cea98A`.
+enum (`None / PendingConsent / Opened / Closed / Solved`) por `caseId`; no almacena
+contenido. Hardhat 3 con 19 tests pasando. Redesplegado en Sepolia:
+`0x0a481Eeb5971ab086e3B7A2c22fe9C37f91fEd6c`.
 
 La integración de Vercel Marketplace para Upstash inyecta
 `UPSTASH_REDIS_KV_REST_API_URL` / `UPSTASH_REDIS_KV_REST_API_TOKEN` — con el
@@ -57,10 +64,12 @@ nombre del store en el medio — en lugar de `UPSTASH_REDIS_REST_URL` /
 `UPSTASH_REDIS_REST_TOKEN` que sugiere la documentación genérica de Upstash.
 `createRedisClient()` acepta los tres variantes de nombres como alias.
 
-Una simplificación marcada como PROVISIONAL en el código:
+Simplificaciones marcadas como PROVISIONAL en el código:
 
-- Las transiciones on-chain las firma un único `backendSigner` del backend (en lugar
-  del consentimiento por parte vía Privy — deferred to bonus phase).
+- `consentToOpen` verifica la firma ECDSA de cada parte on-chain, pero la tx la
+  paga el backend como meta-transacción (gas abstraction por parte, deferred).
+- `closeCase` y `solveCase` siguen firmados por un único `backendSigner` del
+  backend, sin consentimiento por parte vía Privy — deferred to bonus phase.
 
 El resumen se genera mediante llamada directa a Claude Haiku — implementado en
 Fase 5. Chainlink CRE queda para la fase bonus.
@@ -148,7 +157,7 @@ node --test src/lib/invitations/link.test.mjs  # 4/4; aún sin script en package
 npm run test:cases        # 7/7 (store con fake in-memory, desde web/)
 npm run test:chain-sync   # 7/7 (helpers on-chain con fakes, desde web/)
 # desde contracts/:
-npm run test:offline      # 13/13 (solc local, sin red)
+npm run test:offline      # 19/19 (solc local, sin red)
 # poblar vitrina (requiere Next.js corriendo o BASE_URL a producción):
 node web/scripts/seed-cases.mjs
 # smoke test manual del SummaryPoller:
