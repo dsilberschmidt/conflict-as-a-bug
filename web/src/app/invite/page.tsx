@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   addInviteePerspective,
@@ -91,6 +92,7 @@ export default function InvitationPage() {
   const [shareLabel, setShareLabel] = useState("Share reflection");
   const [linkMessage, setLinkMessage] = useState("Link ready");
   const [error, setError] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
     let isCurrent = true;
@@ -299,6 +301,53 @@ export default function InvitationPage() {
       }
 
       setError("We couldn't share the link. Please copy it instead.");
+    }
+  }
+
+  async function handleOpenToSolvers() {
+    if (invitation.status !== "ready") return;
+
+    const inv = invitation.invitation;
+    const caseId = inv.caseId;
+
+    const plaintext = [
+      `A's perspective:\n${inv.perspectives.inviter}`,
+      `B's perspective:\n${inv.perspectives.invitee ?? ""}`,
+      `A's understanding of B:\n${inv.paraphrases.inviter?.text ?? ""}`,
+      `B's understanding of A:\n${inv.paraphrases.invitee?.text ?? ""}`,
+    ].join("\n\n");
+
+    setError("");
+    setIsCreating(true);
+
+    try {
+      const { envelope } = await encryptInvitation(inv);
+
+      const openResponse = await fetch("/api/cases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseId, envelope }),
+      });
+
+      if (!openResponse.ok) {
+        const data = await openResponse.json().catch(() => ({}));
+        setError(
+          (data as { error?: string }).error ?? "Something went wrong. Please try again.",
+        );
+        return;
+      }
+
+      void fetch(`/api/cases/${caseId}/summary/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: plaintext }),
+      }).catch((err) => console.error("[summarize] failed:", err));
+
+      router.push(`/showcase/${caseId}`);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setIsCreating(false);
     }
   }
 
@@ -591,6 +640,25 @@ export default function InvitationPage() {
                 <p className="mt-3 text-sm leading-6 text-stone-700">Clarification: {invitation.invitation.paraphrases.inviter.clarification}</p>
               ) : null}
             </section>
+            <div className="flex flex-col gap-3">
+              <div>
+                <h2 className="text-xl font-semibold tracking-tight text-balance">
+                  Open this case to outside perspectives
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                  Share an anonymized version with the community to receive outside
+                  perspectives.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenToSolvers}
+                disabled={isCreating}
+                className="inline-flex w-fit rounded-full bg-stone-900 px-5 py-3 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {isCreating ? "Opening…" : "Open to solvers"}
+              </button>
+            </div>
           </div>
         ) : null}
 
