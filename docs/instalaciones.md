@@ -15,7 +15,7 @@ La aplicación está en `web/`. Desde allí, instalar dependencias con:
 npm install
 ```
 
-No se requieren actualmente credenciales, variables de entorno ni servicios externos para levantar el proyecto.
+Para levantar la interfaz básica no hace falta credencial. El flujo completo requiere `NEXT_PUBLIC_PRIVY_APP_ID`; persistencia requiere `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`, o los alias aceptados `KV_REST_API_URL` / `KV_REST_API_TOKEN` y `UPSTASH_REDIS_KV_REST_API_URL` / `UPSTASH_REDIS_KV_REST_API_TOKEN`; resumen requiere `ANTHROPIC_API_KEY`; y relay Sepolia requiere `CASE_REGISTRY_RPC_URL`, `CASE_REGISTRY_BACKEND_PRIVATE_KEY` y `CASE_REGISTRY_CONTRACT_ADDRESS`.
 
 ## Verificación
 

@@ -12,7 +12,7 @@ La aplicación ofrece un camino alternativo cuando la conversación directa resu
 
 ## Flujo privado de v0.1
 
-El alcance actual es un solo caso privado entre A y B. A escribe `How I see it` y prepara una invitación. B recibe esa perspectiva y escribe la propia. Después, cada persona parafrasea a la otra, confirma o aclara la paráfrasis y se itera hasta que ambas confirmen la comprensión. Solo entonces pueden plantear `What I’m asking for now`.
+El alcance actual es un solo caso privado entre A y B. A escribe `How I see it` y prepara una invitación. B recibe esa perspectiva y escribe la propia. Después, cada persona parafrasea a la otra, confirma o aclara la paráfrasis y se itera hasta que ambas confirmen la comprensión. La idea de formular `What I’m asking for now` pertenece al diseño de producto, pero no existe como campo o etapa separada en la implementación actual.
 
 La comprensión confirmada es el requisito previo a los pedidos posteriores. Es una decisión de producto central y no equivale a acuerdo.
 
@@ -24,11 +24,11 @@ Una versión redactada puede pasar a semipública o pública solamente con conse
 
 ## Implementación actual
 
-La interfaz está implementada con Next.js. `web/src/app/page.tsx` permite a A redactar `How I see it`, revisar la invitación y generar el enlace cifrado. `web/src/app/invite/page.tsx` implementa la ruta estática `/invite`: descifra la cápsula, presenta la perspectiva de A, permite que B escriba la propia y genere el enlace de respuesta, y luego guía a cada persona a parafrasear a la otra, confirmar o pedir aclaración, hasta que ambas confirmen la comprensión mutua. Cuando se alcanza la comprensión confirmada, `/invite` muestra el botón "Open to solvers" que abre el caso a la comunidad en un solo click (ver sección Resumen automático).
+La interfaz está implementada con Next.js. `web/src/app/page.tsx` permite a A redactar `How I see it`, revisar la invitación y generar el enlace cifrado. `web/src/app/invite/page.tsx` implementa la ruta estática `/invite`: descifra la cápsula, presenta la perspectiva de A, permite que B escriba la propia y genere el enlace de respuesta, y luego guía a cada persona a parafrasear a la otra, confirmar o pedir aclaración, hasta comprensión mutua. Desde allí abre el consentimiento de dos partes descrito en Resumen automático.
 
-`web/src/lib/invitations/crypto.ts` implementa cifrado local independiente de React y Next.js mediante la Web Crypto API y AES-256-GCM. El tipo central `Invitation` tiene cinco campos: `schemaVersion`, `caseId`, `revision`, `perspectives` (`inviter: string`, `invitee?: string`) y `paraphrases` (`inviter?: Paraphrase`, `invitee?: Paraphrase`). `Paraphrase` contiene `text`, `status` (`"pending" | "clarificationRequested" | "accepted"`) y `clarification?`; `Participant` es el tipo unión `"inviter" | "invitee"`. Cada invitación recibe una clave aleatoria de 256 bits y cada cifrado un IV aleatorio de 96 bits. El sobre de cifrado (`EncryptedInvitationEnvelope`) conserva solo `version`, `algorithm`, `iv` y `ciphertext`; `iv` y `ciphertext` viajan codificados como base64url.
+`web/src/lib/invitations/crypto.ts` implementa cifrado local independiente de React y Next.js mediante la Web Crypto API y AES-256-GCM. `Invitation` conserva `schemaVersion`, `caseId`, `revision`, perspectivas y paráfrasis, y añade `consents?: Consent[]` y `openEnvelope?: EncryptedInvitationEnvelope`. `consents` no tiene roles: admite como máximo dos direcciones únicas. `Paraphrase` contiene `text`, `status` (`"pending" | "clarificationRequested" | "accepted"`) y `clarification?`; `Participant` es `"inviter" | "invitee"`. Cada invitación recibe una clave aleatoria de 256 bits y cada cifrado un IV aleatorio de 96 bits. El sobre conserva `version`, `algorithm`, `iv` y `ciphertext` en base64url.
 
-El sobre es el único artefacto apto para almacenar. La `decryptionKey` se devuelve por separado y debe circular por un canal distinto.
+El sobre es el único artefacto apto para almacenar. La `decryptionKey` queda separada del ciphertext y se coloca en el fragmento de la URL, que el navegador no envía al servidor al solicitar la página. Sin embargo, ciphertext y clave se comparten juntos en el enlace completo: ese enlace funciona como secreto portador y quien lo posee puede descifrar el historial. No debe compartirse fuera del canal elegido. La fase privada no se persiste server-side.
 
 ## Backend de casos y contrato Sepolia
 
@@ -48,7 +48,7 @@ la clave de la parte (firma ECDSA personal_sign off-chain). Se requieren dos
 llamadas, una por parte (None → PendingConsent → Opened). `closeCase` y `solveCase`
 siguen firmados por la clave única del backend (PROVISIONAL). `sync.ts` expone
 `tryConsentOnChain` con el mismo patrón fire-and-forget de `tryCloseOnChain` /
-`trySolveOnChain` — exportada, pendiente de wiring en la ruta POST /api/cases.
+`trySolveOnChain` — `POST /api/cases` ya llama secuencialmente a `tryConsentOnChain` para ambas firmas tras persistir el caso. El relay es best-effort: una falla on-chain no revierte Upstash y requiere reconciliación futura.
 `getCaseRegistryClient()` lanza si las variables de entorno
 (`CASE_REGISTRY_RPC_URL`, `CASE_REGISTRY_BACKEND_PRIVATE_KEY`,
 `CASE_REGISTRY_CONTRACT_ADDRESS`) no están definidas.
@@ -124,12 +124,13 @@ guarda el resultado con `caseStore.setSummary`. Es idempotente: si el caso ya
 tiene summary lo devuelve directamente sin volver a llamar a la IA, evitando
 abuso dado que los caseId son públicos.
 
-El botón "Open to solvers" en `/invite` (visible solo cuando
-`isMutualUnderstandingConfirmed` es `true`) encadena en un solo click: armar el
-texto plano de las 4 perspectivas/paráfrasis, cifrar la invitación de nuevo
-(envelope fresco, `decryptionKey` descartada), `POST /api/cases`, y disparar
-`POST /api/cases/[caseId]/summary/generate` como fire-and-forget antes de
-redirigir a `/showcase/[caseId]` con `router.push`.
+Al alcanzar comprensión mutua, `/invite` abre el flujo de consentimiento. La primera persona cifra una vez y fija `openEnvelope`, firma exactamente `JSON.stringify(openEnvelope)`, añade el consentimiento y genera un enlace de transporte nuevo con la invitación actualizada. La segunda firma el mismo string; su dirección determina si es repetida o la segunda parte. Sólo con dos direcciones distintas se hace `POST /api/cases` y se redirige a `/showcase/[caseId]`.
+
+Privy autentica por email y firma desde la wallet embebida con `getEmbeddedConnectedWallet`, provider EIP-1193, `BrowserProvider` y `signer.signMessage(getBytes(messageHash))`. La UX es explícita en dos pasos: sin sesión, el primer clic abre `login()` y muestra `After signing in, select the button again to sign your consent.`; el segundo abre la firma. Reemplaza una reanudación automática que fallaba lint y prerender. Sin `NEXT_PUBLIC_PRIVY_APP_ID`, el fallback conserva el build; puede avisar `useWallets` fuera del provider, pero `/invite` prerenderiza.
+
+Cliente y contrato calculan primero `caseIdHash = keccak256(UTF-8(caseId))` y `stateHash = keccak256(UTF-8(JSON.stringify(openEnvelope)))`; después `messageHash = keccak256(abi.encodePacked(caseIdHash, stateHash))`. La wallet firma los 32 bytes de `messageHash` con EIP-191 y el contrato recupera esa firma al recibir ambos `bytes32`. La cadena recibe hash, firmas, direcciones y estado, nunca texto.
+
+Para generar el resumen, el navegador envía aparte el texto plano de perspectivas/paráfrasis a `POST /api/cases/[caseId]/summary/generate`, que Anthropic procesa. El `openEnvelope` cifrado queda guardado con el caso; el backend no persiste el historial privado antes de la apertura.
 
 ## Límite actual
 
@@ -142,8 +143,9 @@ vitrina, y cualquier persona puede dejar un aporte desde `/showcase/[caseId]`.
 La fase privada entre A y B sigue sin persistencia server-side, por diseño: el
 estado viaja cifrado en las URLs y el servidor no almacena el caso.
 
-Pendiente para la fase bonus: firma de transiciones on-chain por parte (Privy)
-y lectura del listado de casos desde el contrato en lugar del backend.
+La prueba limpia de producción usó dos emails y wallets distintas: B firmó primero, compartió el enlace de espera y A firmó segundo; caso, showcase y resumen funcionaron. Los relays exitosos fueron `0xd0e5669ee472abd146bac02a0fd70bd860597ad7be72f98d17cd2791ef9b018a` (bloque 11662880) y `0x16a6a8c23dee753b8075afb6d594c7f90cafb46b68c594ba8429027fefbe6b4d` (11662881). Los commits de cierre fueron `98df237` y `ccb0dc4`; Daniel confirmó lint y build. Un `Case already exists` anterior provino de atribuir emails incorrectamente a un caso ya abierto.
+
+Pendiente: reconciliación de relays, consentimiento para cierre/resolución, lectura del listado desde cadena y posible Chainlink CRE.
 
 ## Verificación para continuidad
 
@@ -166,4 +168,4 @@ node web/scripts/seed-cases.mjs
 
 ## Flujo de trabajo
 
-Al terminar cada iteración de desarrollo se reemplaza `docs/pending_review.md`. Incluye objetivo, cambios, archivos, verificación, foco de revisión y próximo paso; debe mantenerse conciso y apto para un repositorio público. La persona usuaria ejecuta pruebas, commits y pushes.
+`docs/pending_review.md` es el output transitorio del programador o herramienta de código. Cada respuesta a un prompt reemplaza por completo el contenido anterior; esa respuesta previa se descarta y no se conserva, reproduce ni acumula dentro de la siguiente. Puede incluir objetivo, cambios propuestos o aplicados, diff, verificación, estado, actualización del propio archivo y próximo paso, según la tarea, con sólo la extensión necesaria para responder al último prompt. No es documentación permanente, bitácora, historial, trazabilidad ni contexto durable entre sesiones; no repite diffs, artifacts ni explicaciones de tareas previas sólo porque continúan en el working tree. Lo que deba persistir se registra en `docs/bitacora.md`, `docs/context.md` u otro archivo `.md` ad hoc apropiado. La persona usuaria ejecuta pruebas, commits y pushes.

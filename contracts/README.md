@@ -1,8 +1,8 @@
 # contracts
 
-`CaseRegistry.sol` — hash + estado por caso (ver `web/src/lib/cases/`).
-Firmado por un único `backendSigner`, PROVISIONAL hasta Privy (ver
-`docs/` en el repo raíz, sección Desarrollo 004).
+`CaseRegistry.sol` guarda hash + estado por caso (ver `web/src/lib/cases/`), sin texto. El contrato vigente en Sepolia es `0x0a481Eeb5971ab086e3B7A2c22fe9C37f91fEd6c`.
+
+`consentToOpen` es una meta-transacción pagada por `backendSigner`: recupera dos firmas EIP-191 sobre el mismo `keccak256(abi.encodePacked(caseIdHash, stateHash))`, exige direcciones distintas y avanza `None → PendingConsent → Opened`. `closeCase` y `solveCase` siguen provisionales bajo el backend signer.
 
 ## Compilar y testear (entorno con red completa)
 
@@ -53,4 +53,6 @@ npx hardhat ignition deploy ignition/modules/CaseRegistry.ts \
 `BACKEND_SIGNER_PRIVATE_KEY` — es la misma clave que después usa el backend
 de la app (`web/src/lib/chain/registry.ts`, env vars
 `CASE_REGISTRY_RPC_URL` / `CASE_REGISTRY_BACKEND_PRIVATE_KEY` /
-`CASE_REGISTRY_CONTRACT_ADDRESS`) para llamar `openCase`/`closeCase`/`solveCase`.
+`CASE_REGISTRY_CONTRACT_ADDRESS`) para llamar `consentToOpen`/`closeCase`/`solveCase`.
+
+Ignition considera desplegado un módulo que ya tiene journal para un `--deployment-id`; cambiar el contrato requiere un ID nuevo para redeploy real. Los journals bajo `ignition/deployments/` se versionan como registro histórico; no contienen claves privadas.

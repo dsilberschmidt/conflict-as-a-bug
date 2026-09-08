@@ -152,3 +152,11 @@
 - **Fecha — hito:** resumen breve.
 - **Decisión:** decisión tomada o **pendiente**.
 - **Estado:** implementado, en curso o pendiente.
+
+# 8 de septiembre de 2026 — Consentimiento de dos partes, cierre de piezas y verificación
+
+- Se completaron las piezas A, B y C: helper de firma Privy, UI de `/invite` y creación/relay del caso.
+- Se redeplegó `CaseRegistry` en Sepolia a `0x0a481Eeb5971ab086e3B7A2c22fe9C37f91fEd6c`; el registro completo de Ignition se conserva para reproducibilidad.
+- La solución final fija un `openEnvelope` en la primera firma y usa dos consentimientos sin roles de direcciones distintas. La UX de login y firma es explícitamente de dos clics tras descartar una reanudación automática que fallaba lint y prerender.
+- En prueba limpia de producción, dos emails y wallets embebidas distintas abrieron un caso, llegaron al showcase y generaron resumen. Los relays fueron exitosos: `0xd0e5669ee472abd146bac02a0fd70bd860597ad7be72f98d17cd2791ef9b018a` (bloque 11662880) y `0x16a6a8c23dee753b8075afb6d594c7f90cafb46b68c594ba8429027fefbe6b4d` (11662881).
+- Daniel confirmó `npm run lint` y `npm run build`; persiste sólo el aviso no bloqueante de `useWallets` sin provider cuando falta App ID.
