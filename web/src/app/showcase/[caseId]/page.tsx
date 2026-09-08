@@ -7,6 +7,7 @@ import { caseStore } from "../../../lib/cases/store.ts";
 import { toPublicCase } from "../../../lib/cases/public-view.ts";
 import type { Contribution } from "../../../lib/cases/types.ts";
 import { ContributionForm } from "./contribution-form.tsx";
+import { SummaryPoller } from "./summary-poller.tsx";
 
 export default async function CaseDetailPage({
   params,
@@ -46,7 +47,10 @@ export default async function CaseDetailPage({
           <h2 className="text-sm font-medium text-stone-500">Summary</h2>
           <p className="mt-3 text-base leading-7 text-stone-900">
             {publicCase.summary ?? (
-              <span className="text-stone-400">Summary pending</span>
+              <>
+                <span className="animate-pulse text-stone-400">Generating summary…</span>
+                <SummaryPoller />
+              </>
             )}
           </p>
         </section>
