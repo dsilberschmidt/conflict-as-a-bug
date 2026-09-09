@@ -9,10 +9,12 @@
     "lint": "eslint",
     "test:crypto": "node --test src/lib/invitations/crypto.test.mjs",
     "test:cases": "node --test src/lib/cases/store.test.mjs",
-    "test:chain-sync": "node --test src/lib/chain/sync.test.mjs"
+    "test:chain-sync": "node --test src/lib/chain/sync.test.mjs",
+    "test:privy-server": "node --test src/lib/privy/server.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
+    "@privy-io/node": "^0.34.0",
     "@privy-io/react-auth": "^3.40.0",
     "@upstash/redis": "^1.38.4",
     "ethers": "^6.17.0",
