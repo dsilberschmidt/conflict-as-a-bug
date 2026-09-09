@@ -50,9 +50,20 @@ export function BackerFlow({ recipientAddress }: { recipientAddress: string }) {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Step 2: send transfer from embedded wallet to case recipient
+      // Step 2: switch to Sepolia, then send transfer from embedded wallet.
+      // switchChain must come before getEthereumProvider() — existing provider
+      // instances are not updated by the switch (Privy types, switchChain note).
       const wallet = getEmbeddedConnectedWallet(wallets);
       if (!wallet) throw new Error("No embedded wallet found. Try logging in again.");
+      try {
+        await wallet.switchChain(11155111);
+      } catch (switchErr) {
+        throw new Error(
+          switchErr instanceof Error && switchErr.message
+            ? `Could not switch wallet to Sepolia: ${switchErr.message}`
+            : "Could not switch wallet to Sepolia. Please try again.",
+        );
+      }
       const provider = new BrowserProvider(await wallet.getEthereumProvider());
       const signer = await provider.getSigner();
       const tx = await signer.sendTransaction({
