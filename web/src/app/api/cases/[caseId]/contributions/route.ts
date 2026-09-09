@@ -17,13 +17,15 @@ export async function POST(
   }
 
   const text = (body as Record<string, unknown> | null)?.text;
+  const rawSeeking = (body as Record<string, unknown> | null)?.seekingBackers;
+  const seekingBackers = typeof rawSeeking === "boolean" ? rawSeeking : undefined;
 
   if (typeof text !== "string" || !text.trim()) {
     return NextResponse.json({ error: "Expected { text: string }" }, { status: 400 });
   }
 
   try {
-    const contribution = await caseStore.addContribution(caseId, text);
+    const contribution = await caseStore.addContribution(caseId, text, seekingBackers);
     return NextResponse.json(contribution, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Case not found")) {

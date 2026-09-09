@@ -12,6 +12,7 @@ export function ContributionForm({
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
+  const [seekingBackers, setSeekingBackers] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -34,7 +35,7 @@ export function ContributionForm({
       const response = await fetch(`/api/cases/${caseId}/contributions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, seekingBackers }),
       });
 
       if (!response.ok) {
@@ -46,6 +47,7 @@ export function ContributionForm({
       }
 
       setText("");
+      setSeekingBackers(false);
       router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
@@ -69,6 +71,15 @@ export function ContributionForm({
           className="w-full resize-y rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-base leading-7 text-stone-900 outline-none transition focus:border-stone-500 focus:bg-white focus:ring-4 focus:ring-stone-200"
         />
       </div>
+      <label className="flex items-center gap-2 text-sm text-stone-600">
+        <input
+          type="checkbox"
+          checked={seekingBackers}
+          onChange={(e) => setSeekingBackers(e.target.checked)}
+          className="h-4 w-4 rounded border-stone-300 accent-stone-800"
+        />
+        This could use backing
+      </label>
       {error ? (
         <p role="alert" className="text-sm leading-6 text-stone-600">
           {error}

@@ -8,6 +8,7 @@ import { toPublicCase } from "../../../lib/cases/public-view.ts";
 import type { Contribution } from "../../../lib/cases/types.ts";
 import { ContributionForm } from "./contribution-form.tsx";
 import { SummaryPoller } from "./summary-poller.tsx";
+import { BackerFlow } from "./backer-flow.tsx";
 
 export default async function CaseDetailPage({
   params,
@@ -21,6 +22,7 @@ export default async function CaseDetailPage({
 
   const publicCase = toPublicCase(record);
   const contributions = await caseStore.listContributions(caseId);
+  const hasSeekerContribution = contributions.some((c) => c.seekingBackers);
 
   return (
     <main className="min-h-screen bg-stone-50 px-6 py-16 text-stone-950 sm:px-10 lg:px-12">
@@ -74,6 +76,12 @@ export default async function CaseDetailPage({
           ) : null}
         </section>
 
+        {hasSeekerContribution && record.recipientAddress ? (
+          <section className="flex flex-col gap-4">
+            <BackerFlow recipientAddress={record.recipientAddress} />
+          </section>
+        ) : null}
+
         <section className="flex flex-col gap-4">
           <h2 className="text-base font-semibold text-stone-900">
             Share your perspective
@@ -94,7 +102,12 @@ function ContributionCard({ contribution }: { contribution: Contribution }) {
   return (
     <article className="rounded-2xl border border-stone-200 bg-white px-6 py-5">
       <div className="flex flex-col gap-3">
-        <p className="text-xs text-stone-400">{formattedDate}</p>
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-stone-400">{formattedDate}</p>
+          {contribution.seekingBackers ? (
+            <span className="text-xs font-medium text-amber-700">seeks backing</span>
+          ) : null}
+        </div>
         <p className="text-base leading-7 text-stone-900">{contribution.text}</p>
       </div>
     </article>

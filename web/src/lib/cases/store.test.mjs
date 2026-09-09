@@ -113,3 +113,24 @@ test("addContribution rejects a case that is not open", async () => {
 
   await assert.rejects(() => store.addContribution("case-1", "Too late."), /not open/);
 });
+
+test("addContribution stores seekingBackers flag when true", async () => {
+  const store = createCaseStore(createFakeKvClient());
+
+  await store.createCase("case-1", SAMPLE_ENVELOPE);
+  await store.addContribution("case-1", "I can help — this needs funding.", true);
+
+  const contributions = await store.listContributions("case-1");
+  assert.equal(contributions.length, 1);
+  assert.equal(contributions[0].seekingBackers, true);
+});
+
+test("addContribution without seekingBackers leaves flag undefined", async () => {
+  const store = createCaseStore(createFakeKvClient());
+
+  await store.createCase("case-1", SAMPLE_ENVELOPE);
+  await store.addContribution("case-1", "Just a regular contribution.");
+
+  const contributions = await store.listContributions("case-1");
+  assert.equal(contributions[0].seekingBackers, undefined);
+});
