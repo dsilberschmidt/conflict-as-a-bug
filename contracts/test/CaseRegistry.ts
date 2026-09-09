@@ -178,53 +178,6 @@ describe("CaseRegistry", () => {
     );
   });
 
-  // solveCase
-
-  it("solves a case that is still open", async () => {
-    const { registry, partyA, partyB } = await deploy();
-    const caseId = caseIdOf("case-1");
-
-    await fullyOpen(registry, caseId, stateHashOf("v1"), partyA, partyB);
-    await expect(registry.solveCase(caseId)).to.emit(registry, "CaseSolved");
-
-    const state = await registry.getCase(caseId);
-    expect(state.status).to.equal(4n); // Solved
-  });
-
-  it("solves a case that was already closed", async () => {
-    const { registry, partyA, partyB } = await deploy();
-    const caseId = caseIdOf("case-1");
-
-    await fullyOpen(registry, caseId, stateHashOf("v1"), partyA, partyB);
-    await registry.closeCase(caseId);
-    await expect(registry.solveCase(caseId)).to.emit(registry, "CaseSolved");
-  });
-
-  it("rejects solving an already-solved case", async () => {
-    const { registry, partyA, partyB } = await deploy();
-    const caseId = caseIdOf("case-1");
-
-    await fullyOpen(registry, caseId, stateHashOf("v1"), partyA, partyB);
-    await registry.solveCase(caseId);
-
-    await expect(registry.solveCase(caseId)).to.be.revertedWithCustomError(
-      registry,
-      "InvalidTransition",
-    );
-  });
-
-  it("rejects solving a case in PendingConsent", async () => {
-    const { registry, partyA } = await deploy();
-    const caseId = caseIdOf("case-1");
-    const stateHash = stateHashOf("v1");
-
-    await registry.consentToOpen(caseId, stateHash, await signConsent(partyA, caseId, stateHash));
-    await expect(registry.solveCase(caseId)).to.be.revertedWithCustomError(
-      registry,
-      "CaseNotFound",
-    );
-  });
-
   // setBackendSigner
 
   it("lets the backend signer rotate itself, emitting BackendSignerUpdated", async () => {
@@ -251,5 +204,66 @@ describe("CaseRegistry", () => {
     const { registry } = await deploy();
     const state = await registry.getCase(caseIdOf("never-opened"));
     expect(state.status).to.equal(0n); // None
+  });
+
+  // getParties
+
+  it("returns the two opening wallets in canonical order", async () => {
+    const { registry, partyA, partyB } = await deploy();
+    const caseId = caseIdOf("case-1");
+    await fullyOpen(registry, caseId, stateHashOf("v1"), partyA, partyB);
+
+    const expected = [partyA.address, partyB.address].sort((a, b) =>
+      BigInt(a) < BigInt(b) ? -1 : 1,
+    );
+    const [first, second] = await registry.getParties(caseId);
+    expect(first).to.equal(expected[0]);
+    expect(second).to.equal(expected[1]);
+  });
+
+  it("rejects getParties for missing and pending cases", async () => {
+    const { registry, partyA } = await deploy();
+    const caseId = caseIdOf("case-1");
+
+    await expect(registry.getParties(caseId)).to.be.revertedWithCustomError(
+      registry,
+      "CaseNotFound",
+    );
+    await registry.consentToOpen(caseId, stateHashOf("v1"), await signConsent(partyA, caseId, stateHashOf("v1")));
+    await expect(registry.getParties(caseId)).to.be.revertedWithCustomError(
+      registry,
+      "CaseNotFound",
+    );
+  });
+
+  // Resolution configuration and solved transition
+
+  it("configures Resolution once and only from the backend signer", async () => {
+    const { registry, backendSigner, otherAccount } = await deploy();
+
+    await expect(
+      registry.connect(otherAccount).setResolutionContract(otherAccount.address),
+    ).to.be.revertedWithCustomError(registry, "NotBackendSigner");
+    await expect(registry.setResolutionContract(otherAccount.address))
+      .to.emit(registry, "ResolutionContractSet")
+      .withArgs(otherAccount.address);
+    expect(await registry.resolutionContract()).to.equal(otherAccount.address);
+    await expect(registry.connect(backendSigner).setResolutionContract(backendSigner.address))
+      .to.be.revertedWithCustomError(registry, "ResolutionContractAlreadySet");
+  });
+
+  it("lets only configured Resolution mark an opened case solved", async () => {
+    const { registry, partyA, partyB, otherAccount } = await deploy();
+    const caseId = caseIdOf("case-1");
+    await fullyOpen(registry, caseId, stateHashOf("v1"), partyA, partyB);
+    await registry.setResolutionContract(otherAccount.address);
+
+    await expect(registry.markSolvedFromResolution(caseId))
+      .to.be.revertedWithCustomError(registry, "NotResolutionContract");
+    await expect(registry.connect(otherAccount).markSolvedFromResolution(caseId))
+      .to.emit(registry, "CaseSolved");
+    expect((await registry.getCase(caseId)).status).to.equal(4n);
+    await expect(registry.connect(otherAccount).markSolvedFromResolution(caseId))
+      .to.be.revertedWithCustomError(registry, "InvalidTransition");
   });
 });

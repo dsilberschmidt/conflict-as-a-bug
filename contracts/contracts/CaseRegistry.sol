@@ -14,9 +14,6 @@ import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 /// over the same stateHash. The backend relays each signature as a
 /// meta-transaction — see consentToOpen for details.
 ///
-/// PROVISIONAL: closeCase and solveCase are still gated by a single
-/// backendSigner key, standing in for real per-party consent. Privy-based
-/// signing for those transitions is deferred to the bonus phase.
 contract CaseRegistry {
     enum Status {
         None,
@@ -31,9 +28,11 @@ contract CaseRegistry {
         Status status;
         uint40 lastUpdatedAt;
         address firstConsentSigner;
+        address secondConsentSigner;
     }
 
     address public backendSigner;
+    address public resolutionContract;
 
     mapping(bytes32 => CaseState) private cases;
 
@@ -42,6 +41,7 @@ contract CaseRegistry {
     event CaseClosed(bytes32 indexed caseId, uint256 timestamp);
     event CaseSolved(bytes32 indexed caseId, uint256 timestamp);
     event BackendSignerUpdated(address indexed previousSigner, address indexed newSigner);
+    event ResolutionContractSet(address indexed resolutionContract);
 
     error NotBackendSigner();
     error CaseAlreadyExists();
@@ -50,9 +50,16 @@ contract CaseRegistry {
     error ZeroAddress();
     error ConsentHashMismatch();
     error DuplicateConsentSigner();
+    error NotResolutionContract();
+    error ResolutionContractAlreadySet();
 
     modifier onlyBackendSigner() {
         if (msg.sender != backendSigner) revert NotBackendSigner();
+        _;
+    }
+
+    modifier onlyResolutionContract() {
+        if (msg.sender != resolutionContract) revert NotResolutionContract();
         _;
     }
 
@@ -66,6 +73,16 @@ contract CaseRegistry {
         if (newSigner == address(0)) revert ZeroAddress();
         emit BackendSignerUpdated(backendSigner, newSigner);
         backendSigner = newSigner;
+    }
+
+    /// @notice Sets the one Resolution contract allowed to mark cases solved.
+    /// This configuration is intentionally immutable after setup.
+    function setResolutionContract(address newResolutionContract) external onlyBackendSigner {
+        if (newResolutionContract == address(0)) revert ZeroAddress();
+        if (resolutionContract != address(0)) revert ResolutionContractAlreadySet();
+
+        resolutionContract = newResolutionContract;
+        emit ResolutionContractSet(newResolutionContract);
     }
 
     /// @notice Records one party's consent to open a case, identified by their
@@ -103,6 +120,7 @@ contract CaseRegistry {
             if (consentSigner == current.firstConsentSigner) revert DuplicateConsentSigner();
             current.status = Status.Opened;
             current.lastUpdatedAt = uint40(block.timestamp);
+            current.secondConsentSigner = consentSigner;
             emit CaseOpened(caseId, stateHash, block.timestamp);
         } else {
             revert CaseAlreadyExists();
@@ -123,15 +141,13 @@ contract CaseRegistry {
         emit CaseClosed(caseId, block.timestamp);
     }
 
-    /// @notice Marks a case solved. Independent of closing — a case can be
-    /// solved while still open, or after being closed.
-    /// PROVISIONAL: the backend calls this only after its own off-chain store
-    /// has recorded both confirmations.
-    function solveCase(bytes32 caseId) external onlyBackendSigner {
+    /// @notice Marks an opened case solved from Resolution's second valid
+    /// party signature. This is the sole path to Solved.
+    function markSolvedFromResolution(bytes32 caseId) external onlyResolutionContract {
         CaseState storage current = cases[caseId];
 
         if (current.status == Status.None || current.status == Status.PendingConsent) revert CaseNotFound();
-        if (current.status == Status.Solved) revert InvalidTransition();
+        if (current.status != Status.Opened) revert InvalidTransition();
 
         current.status = Status.Solved;
         current.lastUpdatedAt = uint40(block.timestamp);
@@ -143,5 +159,15 @@ contract CaseRegistry {
     /// (status == None) for a caseId that was never seen.
     function getCase(bytes32 caseId) external view returns (CaseState memory) {
         return cases[caseId];
+    }
+
+    /// @notice Returns the two opening wallets in canonical ascending order.
+    function getParties(bytes32 caseId) external view returns (address first, address second) {
+        CaseState memory current = cases[caseId];
+        if (current.status == Status.None || current.status == Status.PendingConsent) revert CaseNotFound();
+
+        first = current.firstConsentSigner;
+        second = current.secondConsentSigner;
+        if (uint160(first) > uint160(second)) (first, second) = (second, first);
     }
 }
