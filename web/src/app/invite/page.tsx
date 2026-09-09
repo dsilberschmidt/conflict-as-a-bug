@@ -81,6 +81,30 @@ function getWorkflow(invitation: Invitation): Workflow {
   };
 }
 
+async function generateSummaryWithRetry(
+  caseId: string,
+  text: string,
+  maxAttempts = 3,
+): Promise<void> {
+  const retryDelays = [1000, 2000];
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const res = await fetch(`/api/cases/${caseId}/summary/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (res.ok) return;
+    } catch {
+      // network error — fall through to retry
+    }
+    if (attempt < maxAttempts - 1) {
+      await new Promise<void>((resolve) => setTimeout(resolve, retryDelays[attempt]));
+    }
+  }
+  console.error(`[summarize] failed after ${maxAttempts} attempts for case ${caseId}`);
+}
+
 export default function InvitationPage() {
   const [invitation, setInvitation] = useState<InvitationState>({ status: "loading" });
   const [responseStep, setResponseStep] = useState<"compose" | "review">("compose");
@@ -374,12 +398,8 @@ export default function InvitationPage() {
         return;
       }
 
-      void fetch(`/api/cases/${inv.caseId}/summary/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: plaintext }),
-      }).catch((err) => console.error("[summarize] failed:", err));
-
+      setInfoMessage("Generating summary…");
+      await generateSummaryWithRetry(inv.caseId, plaintext);
       router.push(`/showcase/${inv.caseId}`);
     } catch (error) {
       if (error instanceof ConsentLoginStartedError) {
