@@ -40,23 +40,39 @@ el primer uso, no al importar). Las operaciones cubren creación de casos, estad
 (`opened / closed / solved`), contribuciones de solvers y resumen público. Cinco
 rutas API bajo `web/src/app/api/cases/` exponen estas operaciones.
 
-`web/src/lib/chain/registry.ts` implementa `CaseRegistryClient` (ethers v6):
-convierte el `caseId` string a `bytes32` vía `keccak256`. Para abrir un caso
-expone `consentToOpen(caseId, content, signature)`: meta-transacción en la que el
-backend firma la tx en Ethereum, pero el consentimiento se verifica on-chain contra
-la clave de la parte (firma ECDSA personal_sign off-chain). Se requieren dos
-llamadas, una por parte (None → PendingConsent → Opened). `closeCase` y `solveCase`
-siguen firmados por la clave única del backend (PROVISIONAL). `sync.ts` expone
-`tryConsentOnChain` con el mismo patrón fire-and-forget de `tryCloseOnChain` /
-`trySolveOnChain` — `POST /api/cases` ya llama secuencialmente a `tryConsentOnChain` para ambas firmas tras persistir el caso. El relay es best-effort: una falla on-chain no revierte Upstash y requiere reconciliación futura.
-`getCaseRegistryClient()` lanza si las variables de entorno
-(`CASE_REGISTRY_RPC_URL`, `CASE_REGISTRY_BACKEND_PRIVATE_KEY`,
-`CASE_REGISTRY_CONTRACT_ADDRESS`) no están definidas.
+**Producción actual.** `web/src/lib/chain/registry.ts` implementa
+`CaseRegistryClient` (ethers v6) y continúa apuntando al `CaseRegistry` anterior
+desplegado en Sepolia (`0x0a481Eeb5971ab086e3B7A2c22fe9C37f91fEd6c`). Para abrir
+un caso relaya dos consentimientos EIP-191 (None → PendingConsent → Opened). El
+cliente/backend y la interfaz aún no están conectados a los contratos nuevos; por
+eso producción conserva el camino anterior, incluido su `solveCase` provisional
+controlado por backend. Los casos de ese contrato anterior no serán compatibles
+con la nueva resolución.
 
-`contracts/CaseRegistry.sol` es el registro on-chain: guarda un hash de estado y un
-enum (`None / PendingConsent / Opened / Closed / Solved`) por `caseId`; no almacena
-contenido. Hardhat 3 con 19 tests pasando. Redesplegado en Sepolia:
-`0x0a481Eeb5971ab086e3B7A2c22fe9C37f91fEd6c`.
+**Primera tanda local, todavía sin desplegar.** Se implementaron
+`contracts/Resolution.sol`, `contracts/Backing.sol` y `contracts/CaseNft.sol`, y
+se amplió el nuevo `contracts/CaseRegistry.sol`. Al abrir, este registry conserva
+las dos wallets y las devuelve ordenadas canónicamente; su única transición a
+`Solved` se delega a la dirección `Resolution` configurada una sola vez. No existe
+ya un camino de resolución únicamente controlado por `backendSigner`.
+
+`Resolution` conserva por caso sólo el hash de la idea, la wallet del solver y
+`seeksBackers`. Verifica dos firmas EIP-191 de las wallets de apertura sobre la
+misma resolución fija. La segunda firma marca resuelto en `Resolution`, llama a
+`CaseRegistry.markSolvedFromResolution` y mintea el NFT soulbound del solver en la
+misma transacción; si cualquiera de los tres pasos falla, todo revierte.
+
+`Backing` guarda una aprobación de auditor vinculada a `caseId`, hash de idea,
+solver y destinataria canónica. Después de resuelto, el único backer elegible hace
+el aporte fijo; registrar el backer, transferir el ETH a la destinataria y mintear
+su NFT transferible ocurren en una sola transacción o revierten en conjunto.
+`CaseNft` limita de forma inmutable los minters de solver y backer y conserva
+metadatos mínimos de tipo, `caseId` y fecha.
+
+La tanda local se verificó con `npm run test:offline`: 33/33 tests pasaron. El
+commit `ea997be` está pusheado. Aún faltan despliegue de estos contratos, ABIs y
+clientes, autenticación/relay backend e interfaz; hasta entonces no hay cambio de
+comportamiento en producción.
 
 La integración de Vercel Marketplace para Upstash inyecta
 `UPSTASH_REDIS_KV_REST_API_URL` / `UPSTASH_REDIS_KV_REST_API_TOKEN` — con el

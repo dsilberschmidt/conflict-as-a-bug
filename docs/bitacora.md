@@ -160,3 +160,18 @@
 - La solución final fija un `openEnvelope` en la primera firma y usa dos consentimientos sin roles de direcciones distintas. La UX de login y firma es explícitamente de dos clics tras descartar una reanudación automática que fallaba lint y prerender.
 - En prueba limpia de producción, dos emails y wallets embebidas distintas abrieron un caso, llegaron al showcase y generaron resumen. Los relays fueron exitosos: `0xd0e5669ee472abd146bac02a0fd70bd860597ad7be72f98d17cd2791ef9b018a` (bloque 11662880) y `0x16a6a8c23dee753b8075afb6d594c7f90cafb46b68c594ba8429027fefbe6b4d` (11662881).
 - Daniel confirmó `npm run lint` y `npm run build`; persiste sólo el aviso no bloqueante de `useWallets` sin provider cuando falta App ID.
+
+# 9 de septiembre de 2026 — Primera tanda de resolución y backing local
+
+- Se implementaron localmente `Resolution`, `Backing` y `CaseNft`, junto con la
+  ampliación de `CaseRegistry` para conservar las dos wallets de apertura y
+  delegar `Solved` exclusivamente en `Resolution`.
+- La segunda firma EIP-191 de resolución actualiza atómicamente `Resolution` y
+  `CaseRegistry`, y mintea en esa misma transacción el NFT soulbound del solver.
+- La aprobación de auditor queda ligada a caso, hash de idea, solver y
+  destinataria; el aporte fijo del backer, la transferencia inmediata y el NFT
+  transferible del backer son atómicos.
+- `npm run test:offline` pasó 33/33 tests. El commit `ea997be` está pusheado.
+- Los contratos de esta tanda todavía no están desplegados ni conectados al
+  backend o la interfaz. Producción sigue usando el `CaseRegistry` anterior, y
+  sus casos no serán compatibles con la nueva resolución.
