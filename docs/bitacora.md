@@ -176,7 +176,64 @@
   backend o la interfaz. Producción sigue usando el `CaseRegistry` anterior, y
   sus casos no serán compatibles con la nueva resolución.
 
-# 10 de septiembre de 2026 — Desarrollo 009: slice aislado de resumen confidencial CRE
+# 9 de septiembre de 2026 — Identidad Privy server-side (tanda 008)
+
+- Se implementó `web/src/lib/privy/server.ts`: módulo reutilizable que verifica
+  access tokens Privy y devuelve `{ userId, walletAddress }`. Se verificó el paquete
+  correcto leyendo los `.d.ts` reales del tarball: `@privy-io/node@0.34.0`
+  (`verifyAuthToken` está `@deprecated`; la API vigente es `verifyAccessToken`).
+- Bug detectado y corregido antes del commit: el sort por `walletIndex` estaba en
+  el verifier en lugar de en `resolvePrivyIdentity()` — el test 6 expuso que la
+  invariante se rompía con un verifier inyectado en orden distinto.
+- Corrección de lint: parámetros `_token` y `_userId` en los fakes de test
+  generaban 2 warnings; eliminados (las funciones usan el closure).
+- 6/6 tests con fakes inyectados, sin red ni variables de entorno. `PRIVY_APP_SECRET`
+  provisionada en Vercel y verificada funcionando en producción.
+
+# 9 de septiembre de 2026 — Flujo financiero mínimo (tanda 008-B)
+
+- Se decidió construir una versión recortada del flujo de backing (seekingBackers +
+  Audit efímero + faucet + transferencia real) en lugar de integrar
+  Resolution/Backing/CaseNft completo, tras verificar contra la página oficial de
+  premios de ETHOnline 2026 que "Best financial flow" exige una transferencia real
+  ejecutada por una wallet Privy — no alcanza con firmas EIP-191 ni relay de NFT.
+- Implementación de la tanda 008-B: `seekingBackers` en `Contribution`,
+  `recipientAddress` en `CaseRecord`, `BackerFlow` client component (Audit efímero +
+  "Fund this project"), faucet en `POST /api/faucet` con guarda Upstash. El revisor
+  (Desarrollo 008) verificó lint, tests y build en sandbox aislado antes de cada
+  aprobación; Daniel corrió lint/tests/build en su propia máquina después de cada
+  aprobación y antes de cada commit.
+- Bug real encontrado en producción: transacción fallaba con "missing revert data
+  (action=estimateGas…)" pese a wallet fondeada. Diagnosticado como falta de
+  `wallet.switchChain(11155111)` antes de operar la wallet embebida —
+  `PrivyClientProvider.tsx` nunca configura `defaultChain`/`supportedChains`, y
+  `backer-flow.tsx` es el primer código del proyecto que manda una tx on-chain real
+  desde el cliente (todo lo anterior era `signMessage`). Corregido y verificado.
+- Prueba end-to-end exitosa en producción: dos wallets Privy distintas, contribución
+  con `seekingBackers`, Audit, "Fund this project" con tx real confirmada en Sepolia.
+- Nota de proceso: un push anterior de esta tanda quedó sin aplicar en la rama porque
+  Claude Code entendió la aprobación de la propuesta como aplicación directa (la
+  aprobación debe decir explícitamente "aplicá"); y un cambio de `PRIVY_APP_SECRET`
+  en Vercel no tomó efecto hasta un redeploy manual. Ambos ya resueltos; mencionados
+  para no repetirlos sin revisión en tandas futuras.
+
+# 9-10 de septiembre de 2026 — Segunda verificación y notas de testing
+
+- Segunda verificación end-to-end exitosa en producción del flujo financiero mínimo,
+  con un caso distinto (conflicto de gastos de supermercado entre compañeros de
+  cuarto): resumen generado correctamente esta vez sin intervención, tras el fix de
+  reintento con backoff aplicado en `handleOpenToSolvers`. Contribución con
+  `seekingBackers`, Audit, "Fund this project" — exitoso en el segundo intento tras
+  un fallo puntual de "missing revert data" en el primero (causa no diagnosticada;
+  ver future.md).
+- Nota de testing para sesiones futuras: Privy soporta alias de email con "+"
+  (ej. `tuemail+a@gmail.com`, `tuemail+b@gmail.com`) — direcciones distintas para
+  Privy, misma bandeja de entrada real, útil para generar identidades de prueba sin
+  múltiples cuentas reales. Privy también ofrece "test accounts" oficiales (dashboard
+  → User management → Authentication → Advanced → Enable test accounts) con email y
+  OTP fijos, pensados para automatización con Playwright, aunque solo mantienen una
+  identidad de prueba activa a la vez.
+# 10 de septiembre de 2026 — Desarrollo 010: slice aislado de resumen confidencial CRE
 
 - Se creó el worktree `conflict-as-a-bug-chainlink` desde `ca4e941`, en la rama
   `feat/chainlink-confidential-summary`, y el subproyecto aislado

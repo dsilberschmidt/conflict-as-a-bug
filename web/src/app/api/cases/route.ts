@@ -65,7 +65,8 @@ export async function POST(request: NextRequest) {
   let created: CaseRecord;
 
   try {
-    created = await caseStore.createCase(caseId, envelope);
+    // consents[0].address is an arbitrary demo choice for the recipient — see types.ts.
+    created = await caseStore.createCase(caseId, envelope, consents[0].address);
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Case already exists")) {
       return NextResponse.json({ error: "Case already exists" }, { status: 409 });

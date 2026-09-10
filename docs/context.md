@@ -90,8 +90,8 @@ Simplificaciones marcadas como PROVISIONAL en el código:
 El resumen se genera mediante llamada directa a Claude Haiku — implementado en
 Fase 5. El generador directo sigue siendo el comportamiento actual de `web/`.
 El trabajo aislado de Chainlink CRE para sustituir esa llamada de forma
-confidencial se describe en [Desarrollo 009: resumen confidencial con
-CRE](#desarrollo-009--resumen-confidencial-con-chainlink-cre); todavía no está
+confidencial se describe en [Desarrollo 010: resumen confidencial con
+CRE](#desarrollo-010--resumen-confidencial-con-chainlink-cre); todavía no está
 integrado en la aplicación.
 
 ## Vitrina pública y aportes de solvers
@@ -152,7 +152,73 @@ Cliente y contrato calculan primero `caseIdHash = keccak256(UTF-8(caseId))` y `s
 
 Para generar el resumen, el navegador envía aparte el texto plano de perspectivas/paráfrasis a `POST /api/cases/[caseId]/summary/generate`, que Anthropic procesa. El `openEnvelope` cifrado queda guardado con el caso; el backend no persiste el historial privado antes de la apertura.
 
-## Desarrollo 009 — resumen confidencial con Chainlink CRE
+## Identidad Privy server-side y flujo financiero mínimo
+
+`web/src/lib/privy/server.ts` implementa la verificación server-side de identidad
+Privy. `resolvePrivyIdentity(authorizationHeader, options?)` extrae el Bearer token,
+lo verifica con Privy, resuelve la wallet embebida principal y devuelve
+`PrivyIdentity { userId, walletAddress }`. `PrivyAuthError` tipifica los errores con
+`status: 401 | 403 | 422` (token ausente o inválido, wallet no encontrada, wallet
+declarada que no pertenece a la identidad). La selección de wallet aplica
+`sort((a, b) => a.walletIndex - b.walletIndex)[0]` en `resolvePrivyIdentity()`, no en
+el verifier, para que la invariante se sostenga con cualquier implementación inyectada.
+La interfaz `PrivyVerifier` permite tests sin red ni variables de entorno; el singleton
+`_defaultVerifier` se inicializa en el primer uso. Variables de entorno:
+`NEXT_PUBLIC_PRIVY_APP_ID` y `PRIVY_APP_SECRET` — ambas provisionadas en Vercel y
+verificadas funcionando end-to-end en producción (faucet + transferencia real
+confirmada en Sepolia). Asimetría de confianza: `Resolution.resolve` verifica firmas
+EIP-191 on-chain; `Resolution.registerIdea` y `rejectIdea` son `onlyBackendSigner`
+sin verificación on-chain — las rutas que consuman `PrivyIdentity` deben evaluar cuál
+aplica por función.
+
+**Flujo financiero mínimo (tanda 008-B).** Construido como versión recortada del flujo
+de backing para el premio "Best financial flow" de ETHOnline 2026, que exige una
+transferencia real ejecutada por una wallet Privy — no alcanza con firmas EIP-191 ni
+mint de NFT vía relay. Los contratos `Resolution`, `Backing`, `CaseNft` y la
+ampliación de `CaseRegistry` siguen intactos, locales y sin desplegar (ver
+`future.md`); este flujo convive con ellos sin modificarlos.
+
+`Contribution` (types.ts) añade `seekingBackers?: boolean`, marcado por el solver
+anónimo al dejar su aporte en `/showcase/[caseId]` vía un checkbox en
+`contribution-form.tsx` ("This could use backing"). `POST /api/cases/[caseId]/contributions`
+recibe y persiste el flag. `CaseRecord` añade `recipientAddress?: string`, poblado en
+`POST /api/cases` desde `consents[0].address` — simplificación arbitraria de demo
+documentada en el código; el mecanismo real de selección de destinatario vive en
+`Backing.sol` (ver `future.md`).
+
+Si al menos una contribución tiene `seekingBackers: true` y el caso tiene
+`recipientAddress`, `showcase/[caseId]/page.tsx` renderiza `BackerFlow`
+(backer-flow.tsx), un client component con dos estados: primero una tarjeta con botón
+"Audit" y el texto explícito "Simulated PoC audit — approves automatically, no human
+review" — estado efímero solo en `useState`, sin persistencia en Upstash ni backend,
+se pierde al recargar, intencional para esta versión; al confirmarlo aparece "Fund this
+project", que ejecuta `signer.sendTransaction({ to: recipientAddress, value: parseEther("0.001") })`
+— una transferencia real de 0.001 Sepolia ETH desde la wallet embebida del usuario.
+
+`web/src/lib/faucet/funder.ts` implementa el faucet: `POST /api/faucet` (gateada por
+`resolvePrivyIdentity`) manda un monto fijo de 0.005 ETH desde la wallet del backend
+(`CASE_REGISTRY_BACKEND_PRIVATE_KEY` — la misma que ya firma los relays de
+`consentToOpen`, sin variable nueva) a la wallet del usuario autenticado. Una guarda
+en Upstash (`faucet:funded:<dirección-en-minúsculas>`) impide mandar dos veces ante
+reintentos. La lógica es inyectable (`FaucetKv`, `FaucetSender`) para tests sin red.
+
+`backer-flow.tsx` es el primer código del proyecto que emite una transacción on-chain
+real desde el cliente (todo lo anterior era `signMessage`, que no depende de la red).
+`PrivyClientProvider.tsx` nunca configura `defaultChain`/`supportedChains`, por lo que
+la wallet embebida no tiene red fija por defecto. Sin `switchChain`, `estimateGas`
+falla con "missing revert data" incluso con la wallet fondeada. La secuencia correcta:
+`wallet.switchChain(11155111)` → `wallet.getEthereumProvider()` → `BrowserProvider`
+→ `getSigner()` → `sendTransaction()`. El orden es obligatorio: los tipos de Privy
+documentan que `switchChain` no actualiza instancias de provider ya construidas. Si
+`switchChain` falla, el error se convierte en "Could not switch wallet to Sepolia: …"
+antes de mostrarse en pantalla.
+
+Verificado end-to-end en producción el 9 de septiembre de 2026: caso nuevo creado vía
+`/invite` con dos wallets Privy distintas, contribución con `seekingBackers`, Audit,
+"Fund this project" exitoso con tx confirmada on-chain en Sepolia. Pendiente sin
+resolver aparte: el resumen automático (Claude Haiku) no se generó para ese caso de
+prueba — causa todavía no diagnosticada, no relacionada con este código.
+## Desarrollo 010 — resumen confidencial con Chainlink CRE
 
 El worktree `conflict-as-a-bug-chainlink`, creado desde el commit `ca4e941`,
 usa la rama `feat/chainlink-confidential-summary`. Contiene el subproyecto
@@ -244,6 +310,12 @@ La prueba limpia de producción usó dos emails y wallets distintas: B firmó pr
 
 Pendiente: reconciliación de relays, consentimiento para cierre/resolución, lectura del listado desde cadena y posible Chainlink CRE.
 
+El flujo financiero mínimo está implementado y verificado en producción: solver anónimo
+puede marcar una contribución como "seeks backing", cualquier persona puede auditar y
+fondear el caso, y la transferencia real de ETH desde la wallet embebida Privy llega
+on-chain en Sepolia. El faucet de backend asegura que la wallet del usuario tenga gas
+antes de iniciar la transferencia.
+
 ## Verificación para continuidad
 
 Desde `web/`:
@@ -253,10 +325,12 @@ npm run lint        # sin warnings
 npm run test:crypto # 7/7
 npm run build       # / e /invite estáticas; /showcase y /showcase/[caseId] como ƒ (Dynamic)
 node --test src/lib/invitations/link.test.mjs  # 4/4; aún sin script en package.json
-npm run test:cases        # 7/7 (store con fake in-memory, desde web/)
+npm run test:cases        # 9/9 (store con fake in-memory, desde web/)
 npm run test:chain-sync   # 7/7 (helpers on-chain con fakes, desde web/)
+npm run test:privy-server # 6/6 (identidad Privy server-side con fakes, desde web/)
+npm run test:faucet       # 2/2 (guarda de fondeo con fakes, desde web/)
 # desde contracts/:
-npm run test:offline      # 19/19 (solc local, sin red)
+npm run test:offline      # 33/33 (solc local, sin red)
 # poblar vitrina (requiere Next.js corriendo o BASE_URL a producción):
 node web/scripts/seed-cases.mjs
 # smoke test manual del SummaryPoller:

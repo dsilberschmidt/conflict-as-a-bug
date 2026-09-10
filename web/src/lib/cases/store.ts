@@ -54,6 +54,7 @@ export function createCaseStore(client: KvClient) {
     async createCase(
       caseId: string,
       encryptedHistory: EncryptedInvitationEnvelope,
+      recipientAddress?: string,
     ): Promise<CaseRecord> {
       const existing = await client.get<CaseRecord>(recordKey(caseId));
 
@@ -65,6 +66,7 @@ export function createCaseStore(client: KvClient) {
         caseId,
         status: "opened",
         createdAt: new Date().toISOString(),
+        ...(recipientAddress ? { recipientAddress } : {}),
         encryptedHistory,
       };
 
@@ -89,7 +91,7 @@ export function createCaseStore(client: KvClient) {
     },
 
     /** Records an anonymous, unmoderated free-text contribution from a solver. */
-    async addContribution(caseId: string, text: string): Promise<Contribution> {
+    async addContribution(caseId: string, text: string, seekingBackers?: boolean): Promise<Contribution> {
       const record = await requireCase(caseId);
 
       if (record.status !== "opened") {
@@ -99,6 +101,7 @@ export function createCaseStore(client: KvClient) {
       const contribution: Contribution = {
         id: randomUUID(),
         text,
+        ...(seekingBackers ? { seekingBackers: true } : {}),
         createdAt: new Date().toISOString(),
       };
 

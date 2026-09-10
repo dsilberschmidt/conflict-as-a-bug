@@ -15,6 +15,12 @@ export interface CaseRecord {
   caseId: string;
   status: CaseStatus;
   createdAt: string;
+  /**
+   * Ethereum address that receives any backing transfer for this case.
+   * Set at creation time to consents[0].address — an arbitrary demo
+   * simplification; the real selection mechanism lives in Backing.sol (see future.md).
+   */
+  recipientAddress?: string;
   /** Public, plaintext. Produced by the Chainlink CRE Confidential Workflow. */
   summary?: string;
   /**
@@ -33,4 +39,5 @@ export interface Contribution {
   id: string;
   text: string;
   createdAt: string;
+  seekingBackers?: boolean;
 }
