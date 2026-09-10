@@ -277,3 +277,22 @@
   claves, secretos de producción en Vault, despliegue/verificación sintéticos,
   verificación completa y unión de rama. El estado y fronteras constan en
   `docs/context.md` y `cre-confidential-summary/README.md`.
+- `origin/main` se incorporó a la rama mediante `6bbeda1` y se pusheó. Con Node
+  24.20.0 pasaron lint, los 40/40 tests de `web/` y `next build`.
+- Tras habilitar las variables necesarias para Preview, los redeploys del
+  deployment antiguo conservaron su configuración previa; fue necesario crear
+  un deployment nuevo desde Git. En ese nuevo Preview, con datos sintéticos, se
+  completaron dos identidades y wallets Privy, dos consentimientos firmados,
+  apertura del caso, generación del resumen, contribución de solver con
+  solicitud de backing, audit simulado y transferencia real en Sepolia. La
+  transacción confirmada fue
+  `0xda1bca95b24ca5fd0deee636ae2e26dc6b1a3b0354769e55c38efe3a6cab2190`.
+- El resumen de `web/` siguió usando el generador directo, no CRE, y devolvió
+  un título Markdown antes del párrafo. El primer intento de financiación
+  terminó en `estimateGas`; tras esperar y reintentar, la wallet permitió firmar
+  y la transferencia pasó. Esto es compatible con un retraso de propagación del
+  saldo, pero todavía no está demostrado. Además, el cliente no comprueba hoy la
+  respuesta HTTP de `/api/faucet`.
+- Antes del merge: impedir títulos Markdown en el generador directo, validar la
+  respuesta del faucet y esperar/reintentar de forma controlada hasta que el RPC
+  vea el saldo; luego ejecutar tests, build y una prueba corta de Preview.

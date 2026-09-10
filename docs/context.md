@@ -292,8 +292,31 @@ real, integración web ni verificación de confidencialidad en producción.
 
 Quedan pendientes solicitar acceso de despliegue a Confidential Workflows,
 integrar cifrado e invocación CRE con `web/`, definir distribución y rotación de
-claves, cargar secretos de producción en Vault, desplegar y verificar con datos
-sintéticos, verificar la aplicación completa y unir la rama.
+claves, cargar secretos de producción en Vault y desplegar y verificar con datos
+sintéticos, verificar la aplicación completa y unir la rama. `origin/main` ya
+se incorporó a esta rama mediante `6bbeda1` y se pusheó.
+
+Con Node 24.20.0 pasaron lint, los 40/40 tests de `web/` y `next build`.
+Después de habilitar las variables necesarias para Preview, fue necesario crear
+un deployment nuevo desde Git: los redeploys del deployment anterior seguían
+usando su configuración previa. En ese nuevo Preview se verificó el flujo con
+datos sintéticos: dos identidades y wallets Privy, dos consentimientos firmados,
+apertura del caso, generación del resumen, contribución de solver con solicitud
+de backing, audit simulado y transferencia real en Sepolia. La transacción
+confirmada fue
+`0xda1bca95b24ca5fd0deee636ae2e26dc6b1a3b0354769e55c38efe3a6cab2190`.
+
+La generación de resumen en `web/` siguió usando el generador directo, no CRE,
+y devolvió un título Markdown antes del párrafo. El primer intento de
+financiación terminó en `estimateGas`; tras esperar y reintentar, la wallet
+permitió firmar y la transferencia pasó. Es compatible con un retraso de
+propagación del saldo, pero todavía no está demostrado. El cliente tampoco
+comprueba actualmente la respuesta HTTP de `/api/faucet`.
+
+Antes del merge quedan por impedir títulos Markdown en el generador directo,
+validar la respuesta del faucet y esperar/reintentar de forma controlada hasta
+que el RPC vea el saldo; después, ejecutar tests, build y una prueba corta de
+Preview.
 
 ## Límite actual
 
