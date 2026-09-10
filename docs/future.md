@@ -20,6 +20,18 @@ producción y ampliaciones de producto siguen pendientes.
   signer provisional.
 - Hardening de producción: autorización, límites, recuperación, auditoría, observabilidad y UX de errores.
 - Chainlink CRE u otro procesamiento posterior, sin alterar el `openEnvelope` ya firmado.
+- Paginación del listado público: `listCasesByStatus` usa `smembers` de Redis y
+  devuelve todos los casos `opened` sin límite — crece indefinidamente con el uso.
+  Decisión explícita de esta sesión: no resolverlo ahora, prioridad es la entrega y
+  Chainlink. Si el proyecto tiene uso externo real, dos mejoras baratas quedan
+  pendientes: paginación con cursor, o separar/filtrar casos de prueba de casos reales
+  en la vista pública.
+- Intermitencia de "Fund this project": durante las pruebas del 9-10 de septiembre
+  se observó un fallo puntual de "missing revert data (action=estimateGas…)" pese a
+  que `switchChain(11155111)` ya estaba aplicado y la wallet tenía balance suficiente;
+  reintentar la misma acción funcionó sin cambios. Causa no identificada — posible RPC
+  lento o timing de `switchChain`. Anotado como posible intermitencia a vigilar,
+  especialmente relevante si se graba una demo en vivo.
 
 ## Hardening contractual posterior a la PoC
 

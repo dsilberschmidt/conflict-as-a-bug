@@ -216,3 +216,20 @@
   aprobación debe decir explícitamente "aplicá"); y un cambio de `PRIVY_APP_SECRET`
   en Vercel no tomó efecto hasta un redeploy manual. Ambos ya resueltos; mencionados
   para no repetirlos sin revisión en tandas futuras.
+
+# 9-10 de septiembre de 2026 — Segunda verificación y notas de testing
+
+- Segunda verificación end-to-end exitosa en producción del flujo financiero mínimo,
+  con un caso distinto (conflicto de gastos de supermercado entre compañeros de
+  cuarto): resumen generado correctamente esta vez sin intervención, tras el fix de
+  reintento con backoff aplicado en `handleOpenToSolvers`. Contribución con
+  `seekingBackers`, Audit, "Fund this project" — exitoso en el segundo intento tras
+  un fallo puntual de "missing revert data" en el primero (causa no diagnosticada;
+  ver future.md).
+- Nota de testing para sesiones futuras: Privy soporta alias de email con "+"
+  (ej. `tuemail+a@gmail.com`, `tuemail+b@gmail.com`) — direcciones distintas para
+  Privy, misma bandeja de entrada real, útil para generar identidades de prueba sin
+  múltiples cuentas reales. Privy también ofrece "test accounts" oficiales (dashboard
+  → User management → Authentication → Advanced → Enable test accounts) con email y
+  OTP fijos, pensados para automatización con Playwright, aunque solo mantienen una
+  identidad de prueba activa a la vez.
