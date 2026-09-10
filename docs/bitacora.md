@@ -175,3 +175,48 @@
 - Los contratos de esta tanda todavía no están desplegados ni conectados al
   backend o la interfaz. Producción sigue usando el `CaseRegistry` anterior, y
   sus casos no serán compatibles con la nueva resolución.
+
+# 10 de septiembre de 2026 — Desarrollo 009: slice aislado de resumen confidencial CRE
+
+- Se creó el worktree `conflict-as-a-bug-chainlink` desde `ca4e941`, en la rama
+  `feat/chainlink-confidential-summary`, y el subproyecto aislado
+  `cre-confidential-summary/`. No se modificaron `web/`, `openEnvelope`, firmas,
+  consentimientos, Privy, relay ni contratos; la generación directa existente
+  sigue siendo la vigente.
+- Se eligió Chainlink Confidential Workflows con `handlerInTee`. Confidential
+  HTTP por sí solo no cubre toda la composición y procesamiento del prompt, y
+  el body de un trigger HTTP en claro no tiene garantía documental de
+  confidencialidad frente al Workflow DON.
+- El protocolo preparado para la futura integración cifra el texto en navegador
+  con AES-256-GCM y IV de 12 bytes, envuelve la clave AES con RSA-OAEP/SHA-256 y
+  envía un envelope versionado asociado a `keyId`. El workflow obtiene la clave
+  privada RSA y `ANTHROPIC_API_KEY` desde Vault dentro del TEE, descifra y llama
+  a Haiku, retornando sólo el resumen. El plugin Rust personalizado realiza el
+  descifrado porque CRE TypeScript ejecuta Javy/QuickJS/WASM, sin `node:crypto`
+  ni disponibilidad documentada de Web Crypto.
+- Daniel verificó los unit tests del subproyecto (`npm test`, 6/6) y el
+  typecheck sin errores después de corregir las entradas Web Crypto con copias
+  explícitas a `ArrayBuffer`. También instaló Rust 1.98.1 con `wasm32-wasip1`,
+  Bun 1.4.2, CRE CLI v1.33.0 y Clang 18. El primer build falló por faltar
+  `stddef.h`; instalado Clang 18, `make build` generó
+  `cre-confidential-summary/wasm/workflow.wasm` compilando workflow TypeScript,
+  SDK de Chainlink y plugin Rust.
+- Se añadieron `workflow.yaml`, `config.staging.json` y
+  `config.production.json`. Aunque el workflow no usa cadena, `project.yaml`
+  incorporó un RPC público de Sepolia porque CRE CLI rechazaba iniciar la
+  simulación sin esa entrada. Se creó la cuenta CRE y se autenticó la CLI, pero
+  el estado informa `Deploy Access: Not enabled`.
+- La simulación con `{}` alcanzó el camino simulado de `handlerInTee` y devolvió
+  `INVALID_INPUT`. Una simulación positiva, sólo con datos sintéticos, descifró
+  mediante el plugin Rust un envelope RSA-OAEP/SHA-256 + AES-256-GCM, llamó
+  realmente a Haiku y devolvió un párrafo neutral sin Markdown. Alterar un byte
+  del ciphertext devolvió `INVALID_INPUT` antes de Anthropic. El hash WASM
+  observado fue `d7295127c04d602089e4df5e185a310df6a87d765b973559cb927398bb8a10ab`.
+- La simulación no es un TEE real y los secretos vinieron de variables de
+  entorno mediante `secrets.yaml`, no de CRE Vault. No hubo despliegue,
+  Workflow DON real, atestación, Vault real, integración web ni verificación de
+  confidencialidad en producción. Siguen pendientes acceso de despliegue a
+  Confidential Workflows, integración con `web/`, distribución y rotación de
+  claves, secretos de producción en Vault, despliegue/verificación sintéticos,
+  verificación completa y unión de rama. El estado y fronteras constan en
+  `docs/context.md` y `cre-confidential-summary/README.md`.

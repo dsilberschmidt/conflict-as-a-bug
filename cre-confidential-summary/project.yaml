@@ -1,0 +1,11 @@
+# This workflow does not read from or write to a chain.
+# CRE CLI currently requires an RPC entry to initialize simulation.
+staging-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com
+
+production-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com

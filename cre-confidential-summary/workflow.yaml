@@ -1,0 +1,15 @@
+staging-settings:
+  user-workflow:
+    workflow-name: "cab-confidential-summary-staging"
+  workflow-artifacts:
+    workflow-path: "./src/workflow.ts"
+    config-path: "./config.staging.json"
+    secrets-path: "./secrets.yaml"
+
+production-settings:
+  user-workflow:
+    workflow-name: "cab-confidential-summary-production"
+  workflow-artifacts:
+    workflow-path: "./src/workflow.ts"
+    config-path: "./config.production.json"
+    secrets-path: "./secrets.yaml"

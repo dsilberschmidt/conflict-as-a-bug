@@ -88,7 +88,11 @@ Simplificaciones marcadas como PROVISIONAL en el código:
   backend, sin consentimiento por parte vía Privy — deferred to bonus phase.
 
 El resumen se genera mediante llamada directa a Claude Haiku — implementado en
-Fase 5. Chainlink CRE queda para la fase bonus.
+Fase 5. El generador directo sigue siendo el comportamiento actual de `web/`.
+El trabajo aislado de Chainlink CRE para sustituir esa llamada de forma
+confidencial se describe en [Desarrollo 009: resumen confidencial con
+CRE](#desarrollo-009--resumen-confidencial-con-chainlink-cre); todavía no está
+integrado en la aplicación.
 
 ## Vitrina pública y aportes de solvers
 
@@ -147,6 +151,83 @@ Privy autentica por email y firma desde la wallet embebida con `getEmbeddedConne
 Cliente y contrato calculan primero `caseIdHash = keccak256(UTF-8(caseId))` y `stateHash = keccak256(UTF-8(JSON.stringify(openEnvelope)))`; después `messageHash = keccak256(abi.encodePacked(caseIdHash, stateHash))`. La wallet firma los 32 bytes de `messageHash` con EIP-191 y el contrato recupera esa firma al recibir ambos `bytes32`. La cadena recibe hash, firmas, direcciones y estado, nunca texto.
 
 Para generar el resumen, el navegador envía aparte el texto plano de perspectivas/paráfrasis a `POST /api/cases/[caseId]/summary/generate`, que Anthropic procesa. El `openEnvelope` cifrado queda guardado con el caso; el backend no persiste el historial privado antes de la apertura.
+
+## Desarrollo 009 — resumen confidencial con Chainlink CRE
+
+El worktree `conflict-as-a-bug-chainlink`, creado desde el commit `ca4e941`,
+usa la rama `feat/chainlink-confidential-summary`. Contiene el subproyecto
+aislado `cre-confidential-summary/`. Esta tanda no modifica `web/`,
+`openEnvelope`, sus firmas, consentimientos, Privy, relay ni contratos. Por
+tanto, el generador actual permanece intacto en `web/src/lib/ai/summarize.ts`:
+usa `@anthropic-ai/sdk` y Anthropic Haiku
+`claude-haiku-4-5-20251001`, recibe `{ text: string }`, produce un párrafo
+neutral y anonimizado de hasta 300 tokens, y lo invoca la ruta idempotente
+`POST /api/cases/[caseId]/summary/generate`.
+
+El diseño de CRE eligió **Confidential Workflows** con `handlerInTee`. No se
+eligió Confidential HTTP por sí solo: protege una petición HTTP confidencial,
+pero no basta para garantizar confidencialidad de toda la composición del
+prompt y su procesamiento. Además, la documentación no garantiza que el body
+en claro de un HTTP trigger permanezca confidencial frente al Workflow DON.
+
+Por ello el cliente futuro debe cifrar el texto antes de enviarlo al trigger.
+El módulo de navegador implementado, aún sin integrar en `web/`, genera una
+clave AES-256-GCM aleatoria, cifra el texto con IV de 12 bytes y AAD que liga la
+versión, algoritmo y `keyId`, y envuelve dicha clave mediante RSA-OAEP con
+SHA-256 usando una clave pública RSA-2048. El envelope versionado contiene
+`version`, `algorithm`, `keyId`, `wrappedKey`, `iv` y `ciphertext`. Se validan
+versión, algoritmo, campos, encoding y tamaños antes de intentar descifrar.
+
+El workflow está programado para recibir únicamente ese ciphertext, recuperar
+en el TEE la clave privada RSA asociada al `keyId` y `ANTHROPIC_API_KEY`,
+descifrar, construir el prompt actual y llamar a Haiku; sólo debe retornar el
+resumen autorizado. En simulación local los secretos se resolvieron desde
+variables de entorno mediante `secrets.yaml`; CRE Vault real no se probó. El
+runtime TypeScript de CRE usa Javy/QuickJS/WASM, no soporta `node:crypto` y no
+documenta Web Crypto como capacidad del workflow. Por ese motivo el descifrado
+se implementó mediante un plugin Rust personalizado.
+
+Cuando la integración futura respete el protocolo, el navegador verá el
+plaintext que cifra, la clave pública y el envelope resultante. El backend y el
+Workflow DON recibirán únicamente ciphertext y metadatos públicos del envelope.
+Vault libera las claves al TEE; durante la ejecución el TEE ve claves,
+plaintext, prompt, respuesta del proveedor y resumen. Anthropic necesariamente
+recibe el plaintext incluido en el prompt para poder producir el resumen. Estas
+fronteras son el diseño previsto, no una garantía de producción hasta desplegar
+y verificar Confidential Workflows con Vault real.
+
+`workflow.yaml`, `config.staging.json` y `config.production.json` fueron
+añadidos para declarar artefactos y configuraciones de staging y producción.
+Aunque el workflow no usa blockchain, `project.yaml` contiene un RPC público de
+Sepolia porque CRE CLI rechazó iniciar la simulación sin una entrada RPC.
+
+La cuenta CRE fue creada y la CLI quedó autenticada, pero informa `Deploy
+Access: Not enabled`. Se verificaron CRE CLI v1.33.0 y
+`@chainlink/cre-sdk` 1.20.0. `npm test` pasó 6/6, `npm run typecheck` pasó y
+`make build` compiló conjuntamente el workflow TypeScript, SDK y plugin Rust.
+El WASM final observado fue
+`d7295127c04d602089e4df5e185a310df6a87d765b973559cb927398bb8a10ab`.
+El prompt ahora exige un único párrafo sin título, label, heading ni Markdown;
+su test verifica `SYSTEM_PROMPT`.
+
+La simulación con `{}` alcanzó el camino simulado de `handlerInTee` y devolvió
+`INVALID_INPUT`. Una simulación positiva con envelope sintético
+RSA-OAEP/SHA-256 + AES-256-GCM fue descifrada por el plugin Rust; el workflow
+llamó realmente a Haiku y devolvió un resumen neutral de un solo párrafo sin
+Markdown. Con un byte del ciphertext alterado devolvió `INVALID_INPUT` antes de
+Anthropic. Según `workflow.ts`, JSON, envelope, clave RSA o descifrado inválidos
+producen `INVALID_INPUT`; clave Anthropic vacía o fallo HTTP,
+`PROVIDER_FAILURE`; y respuesta exitosa mal formada,
+`INVALID_PROVIDER_RESPONSE`.
+
+Las pruebas fueron locales y usaron sólo datos sintéticos. El simulador declara
+que no es un TEE real: no hubo despliegue, Workflow DON real, atestación, Vault
+real, integración web ni verificación de confidencialidad en producción.
+
+Quedan pendientes solicitar acceso de despliegue a Confidential Workflows,
+integrar cifrado e invocación CRE con `web/`, definir distribución y rotación de
+claves, cargar secretos de producción en Vault, desplegar y verificar con datos
+sintéticos, verificar la aplicación completa y unir la rama.
 
 ## Límite actual
 
