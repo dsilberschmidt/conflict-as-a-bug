@@ -94,3 +94,54 @@ verificar Confidential Workflows con Vault real.
 - https://docs.chain.link/cre/concepts/typescript-wasm-runtime
 - https://docs.chain.link/cre/guides/workflow/secrets/using-secrets-deployed
 - https://docs.chain.link/cre/guides/operations/custom-rust-plugins-ts
+
+## Reproducir la demostración de CRE Confidential Summary
+
+Esta rama conserva una demostración reproducible del workflow confidencial de Chainlink CRE. La prueba usa exclusivamente un input sintético del conflicto de la guitarra. No utiliza datos privados del caso real.
+
+El WASM compilado se conserva en:
+
+```text
+wasm/workflow.wasm
+```
+
+SHA-256 observado:
+
+```text
+951b6107f35045336ed445b5af97c0e8600836bc374b5ebb344220767f63e1aa
+```
+
+Instalar las dependencias:
+
+```bash
+npm ci
+```
+
+Cargar la API key de Anthropic sin mostrarla ni guardarla en el historial:
+
+```bash
+read -rsp "Anthropic API key: " ANTHROPIC_API_KEY; echo
+export ANTHROPIC_API_KEY
+```
+
+Generar automáticamente una clave RSA temporal y el payload cifrado sintético:
+
+```bash
+eval "$(npm run --silent demo:prepare)"
+```
+
+Ejecutar la simulación:
+
+```bash
+cre workflow simulate . --project-root . --target staging-settings --non-interactive --trigger-index 0 --wasm ./wasm/workflow.wasm --http-payload "$CAB_KEY_DIR/payload.json"
+```
+
+La salida esperada incluye la solicitud de ejecución mediante `handlerInTee`, `Workflow Simulation Result`, el resumen neutral y la finalización exitosa.
+
+La simulación local ejercita el camino confidencial y valida el workflow con input sintético, pero el simulador no constituye una TEE real. Las claves RSA y el payload se crean dentro de un directorio temporal y no se guardan en Git. La API key de Anthropic tampoco debe guardarse en el repositorio.
+
+Si se modifica el código del workflow, reconstruir el WASM con:
+
+```bash
+make build
+```
