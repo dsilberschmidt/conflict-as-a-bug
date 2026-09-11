@@ -416,6 +416,22 @@ fondear el caso, y la transferencia real de ETH desde la wallet embebida Privy l
 on-chain en Sepolia. El faucet de backend asegura que la wallet del usuario tenga gas
 antes de iniciar la transferencia.
 
+El 11 de septiembre, `feat/chainlink-confidential-summary` se integró por
+fast-forward en `main` hasta `ac1cb24` y se pusheó; el deployment de producción
+quedó correcto. Un smoke completo abrió un caso nuevo, publicó la única propuesta
+visible, ejecutó `Audit` y completó el backing con la transacción Sepolia
+`0x9cb116b5c764bcaae4d3be50eea9c3baf57cc435c787d2c1dee173c8822bd79c`.
+
+Este smoke observó dos límites del faucet, separados de la intermitencia
+pre-broadcast de `estimateGas` documentada arriba. La wallet reutilizada
+`0xfdd9791b3a223813e8b3916b82adc37ccdb55563` tenía sólo
+`0.000891598010647 SEP`, insuficiente para transferir `0.001 SEP` más gas; el
+faucet no la recargó porque la marca persistente ya indicaba que había sido
+financiada. Con una identidad Privy nueva, el primer intento mostró `Faucet
+transaction was not confirmed in time. Please try again.`, pero el segundo clic
+funcionó de inmediato: la transacción de fondeo ya había llegado y sólo superó
+el límite cliente de 60 segundos para confirmar.
+
 ## Verificación para continuidad
 
 Desde `web/`:

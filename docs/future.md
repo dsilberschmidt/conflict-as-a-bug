@@ -31,6 +31,13 @@ producción y ampliaciones de producto siguen pendientes.
   dos intentos separados por 2 segundos, ambos intentos pueden fallar antes de
   broadcast. El workaround actual es pulsar otra vez `Fund this project` tras el
   error controlado. Falta identificar si la causa es RPC, wallet o timing de red.
+- Cambiar el faucet para que considere el saldo actual de la wallet —o un umbral
+  de saldo— en vez de basarse exclusivamente en una marca permanente de wallet
+  ya financiada; una wallet previamente financiada puede no tener `0.001 SEP`
+  más gas para completar el backing.
+- Mejorar el manejo de confirmaciones lentas del faucet: si la transacción ya
+  fue emitida pero excede los 60 segundos de espera del cliente, conservar y
+  reconciliar su estado en vez de obligar a repetir manualmente la acción.
 - Reducir la latencia perceptible de `Opening…` durante la creación del caso,
   sin ocultar el estado de progreso ni alterar las firmas, la creación ni la
   generación del resumen.

@@ -375,3 +375,23 @@
   `sendWithEstimateGasRetry` es una mitigación acotada y segura: sólo reintenta
   el fallo pre-broadcast exacto, evita duplicados y mejora el error, pero no
   resuelve la causa de la intermitencia.
+
+# 11 de septiembre de 2026 — integración y smoke de producción
+
+- `feat/chainlink-confidential-summary` se integró por fast-forward en `main`
+  hasta `ac1cb24`, y ese estado se pusheó; `main`, `origin/main` y
+  `origin/feat/chainlink-confidential-summary` quedaron alineados. El deployment
+  de producción quedó en estado correcto.
+- El smoke completo de producción abrió un caso nuevo, permitió publicar la
+  única propuesta visible, ejecutar `Audit` y finalizar el backing. La
+  transferencia de 0.001 Sepolia ETH se confirmó en
+  `0x9cb116b5c764bcaae4d3be50eea9c3baf57cc435c787d2c1dee173c8822bd79c`.
+- Límite independiente de `estimateGas`: al reutilizar la wallet
+  `0xfdd9791b3a223813e8b3916b82adc37ccdb55563`, el saldo era
+  `0.000891598010647 SEP`, insuficiente para transferir `0.001 SEP` más gas.
+  El faucet no pudo recargarla porque ya figuraba como financiada.
+- Límite independiente de `estimateGas`: con una identidad Privy nueva, el
+  primer intento de faucet mostró `Faucet transaction was not confirmed in
+  time. Please try again.`; el segundo clic funcionó inmediatamente. La
+  financiación ya había llegado, pero su confirmación superó el límite de 60
+  segundos del cliente.
