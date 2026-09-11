@@ -1,25 +1,50 @@
 # Conflict as a Bug
 
-Conflict as a Bug helps people treat conflict as a shared problem: describe it, understand each other, and—only with both parties’ consent—open it to people who may help. **Live demo: https://conflict-as-a-bug.vercel.app/**
+Conflict as a Bug turns conflict into a shared problem that can be understood
+before it is opened to people who may help. It was built from scratch during
+ETHOnline 2026.
+**[Try the live demo](https://conflict-as-a-bug.vercel.app/).**
 
-## Current flow
+## Demonstrated flow
 
-Direct conversation is preferred. The app is an alternative when it is unfeasible, inappropriate, interrupted, or insufficient: A and B exchange private encrypted perspectives and paraphrases until they reach confirmed mutual understanding. Understanding is not agreement or resolution.
+Direct conversation is preferred. The app is an alternative when it is
+unfeasible, inappropriate, interrupted, or insufficient.
 
-Then each person signs consent with an email-authenticated Privy embedded wallet. This is intentionally two explicit actions: the first click opens email login and asks the person to select the button again; the second opens the signature. The first signer fixes one encrypted `openEnvelope`, stores their consent and shares a fresh transport link; the second signs that exact envelope and opens the case. The summary is generated separately and the public showcase accepts solver contributions.
+1. A and B exchange private, encrypted perspectives and paraphrases until they
+   confirm mutual understanding. Understanding is not agreement or resolution.
+2. Each person logs in by email with Privy and signs consent using an embedded
+   wallet. The backend relays both signatures to the Sepolia
+   [`CaseRegistry`](https://sepolia.etherscan.io/address/0x0a481Eeb5971ab086e3B7A2c22fe9C37f91fEd6c),
+   which opens and anchors the case.
+3. The public showcase displays a neutral summary. In this PoC, an anonymous,
+   unauthenticated solver can submit one visible contribution and may request
+   backing.
+4. Any visitor can run the simulated audit; it always approves and performs no
+   real review. To provide backing, a backer logs in with Privy and uses an
+   embedded wallet. The faucet supplies testnet ETH to that wallet, which then
+   sends a real on-chain transfer of `0.001` Sepolia ETH to the case recipient.
 
-## Architecture and privacy boundary
+The private invitation state is AES-256-GCM ciphertext, with its decryption key
+in the URL fragment. The whole link is therefore a bearer secret. Case text is
+not stored on-chain: `CaseRegistry` receives hashes, signatures, addresses and
+status only. The private phase between A and B is not persisted server-side;
+Upstash Redis stores opened-case records and contributions.
 
-- Next.js, TypeScript and Web Crypto: the private invitation travels as AES-256-GCM ciphertext. Its decryption key is in the URL fragment, so the complete link is a bearer secret: share it only through the intended channel.
-- Privy: email authentication and EIP-191 signatures through an embedded Ethereum wallet.
-- Upstash Redis stores opened-case records and contributions; Anthropic receives separately supplied plain-text perspectives/paraphrases to generate the summary.
-- Sepolia `CaseRegistry`: [`0x0a481Eeb5971ab086e3B7A2c22fe9C37f91fEd6c`](https://sepolia.etherscan.io/address/0x0a481Eeb5971ab086e3B7A2c22fe9C37f91fEd6c).
+## Summaries: current web app vs. CRE prototype
 
-The private phase is not persisted server-side. On opening, the encrypted `openEnvelope` is fixed and signed. Chain data is limited to hashes, signatures, addresses and status—never case text. See [docs/context.md](docs/context.md) for exact hashing and current limits.
+The deployed web app currently generates the public summary directly through
+Anthropic Haiku (`claude-haiku-4-5-20251001`).
+
+[`cre-confidential-summary/`](cre-confidential-summary/README.md) is a separate
+Chainlink CRE Confidential Workflow prototype. It accepts an
+RSA-OAEP/SHA-256 + AES-256-GCM envelope, decrypts it inside `handlerInTee` with
+a Rust plugin, calls Haiku, and returns only the summary. It has passed CRE CLI
+simulation with synthetic data, but is not connected to the web flow or
+deployed to a DON; no real TEE, Vault, or attestation has been tested.
 
 ## Run locally
 
-Node 24 is specified in `.nvmrc`:
+Node `24` is specified in [`.nvmrc`](.nvmrc).
 
 ```sh
 nvm install
@@ -29,6 +54,23 @@ npm install
 npm run dev
 ```
 
-The complete flow needs `NEXT_PUBLIC_PRIVY_APP_ID`; Upstash accepts `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`, `KV_REST_API_URL` / `KV_REST_API_TOKEN`, or Vercel Marketplace’s `UPSTASH_REDIS_KV_REST_API_URL` / `UPSTASH_REDIS_KV_REST_API_TOKEN`. Summary and relay require `ANTHROPIC_API_KEY`, `CASE_REGISTRY_RPC_URL`, `CASE_REGISTRY_BACKEND_PRIVATE_KEY`, and `CASE_REGISTRY_CONTRACT_ADDRESS`.
+The full web flow requires:
 
-After review, Daniel verifies from `web/` with `npm run lint` and `npm run build` in separate commands. Operational setup and the project record are in [docs/instalaciones.md](docs/instalaciones.md), [docs/context.md](docs/context.md), [docs/bitacora.md](docs/bitacora.md), [docs/roadmap.md](docs/roadmap.md), and [docs/future.md](docs/future.md).
+- `NEXT_PUBLIC_PRIVY_APP_ID`
+- `PRIVY_APP_SECRET`
+- Upstash Redis credentials: `UPSTASH_REDIS_REST_URL` and
+  `UPSTASH_REDIS_REST_TOKEN` (the `KV_REST_*` and
+  `UPSTASH_REDIS_KV_REST_*` aliases are also supported)
+- `ANTHROPIC_API_KEY`
+- `CASE_REGISTRY_RPC_URL`, `CASE_REGISTRY_BACKEND_PRIVATE_KEY`, and
+  `CASE_REGISTRY_CONTRACT_ADDRESS`
+
+Available web commands include `npm run dev`, `npm run lint`, `npm run build`,
+`npm run test:crypto`, `npm run test:cases`, `npm run test:chain-sync`,
+`npm run test:privy-server`, `npm run test:faucet`, and
+`npm run generate:confirmed-invite -- <base-url>`.
+
+For setup, architecture, project history, and known limits, see
+[installation notes](docs/instalaciones.md), [technical context](docs/context.md),
+[project log](docs/bitacora.md), [roadmap](docs/roadmap.md), and
+[future work](docs/future.md).
