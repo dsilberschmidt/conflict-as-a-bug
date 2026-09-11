@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BrowserProvider, parseEther } from "ethers";
 import { getEmbeddedConnectedWallet, usePrivy, useWallets } from "@privy-io/react-auth";
+import { requestFaucet, waitForFaucetTransaction } from "../../../lib/faucet/client";
 
 const TRANSFER_AMOUNT = parseEther("0.001");
 
@@ -46,10 +47,7 @@ export function BackerFlow({ recipientAddress }: { recipientAddress: string }) {
       // Step 1: ensure embedded wallet has gas (faucet — no-op if already funded)
       const token = await getAccessToken();
       if (!token) throw new Error("Could not get access token");
-      await fetch("/api/faucet", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const faucetResult = await requestFaucet(token);
       // Step 2: switch to Sepolia, then send transfer from embedded wallet.
       // switchChain must come before getEthereumProvider() — existing provider
       // instances are not updated by the switch (Privy types, switchChain note).
@@ -65,6 +63,9 @@ export function BackerFlow({ recipientAddress }: { recipientAddress: string }) {
         );
       }
       const provider = new BrowserProvider(await wallet.getEthereumProvider());
+      if (faucetResult.txHash) {
+        await waitForFaucetTransaction(provider, faucetResult.txHash);
+      }
       const signer = await provider.getSigner();
       const tx = await signer.sendTransaction({
         to: recipientAddress,

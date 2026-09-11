@@ -1,9 +1,20 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-const SYSTEM_PROMPT =
+export const SYSTEM_PROMPT =
   "Summarize and anonymize the following conflict in one paragraph. " +
   "Do not identify the parties by name or role — describe the situation " +
-  "and each side's perspective in neutral terms.";
+  "and each side's perspective in neutral terms. Return only that paragraph: " +
+  "no title, heading, label, Markdown, list, or prefatory text.";
+
+/**
+ * Removes only an unambiguous Markdown heading followed by a blank line. This
+ * deliberately leaves inline Markdown, headings without body text, and any
+ * other leading content untouched so the model's content is not discarded.
+ */
+export function removeInitialMarkdownHeading(summary: string): string {
+  const match = /^(?: {0,3}#{1,6}[ \t]+[^\r\n]+)\r?\n[ \t]*\r?\n([\s\S]+)$/.exec(summary);
+  return match ? match[1] : summary;
+}
 
 export async function generateSummary(plaintext: string): Promise<string> {
   const client = new Anthropic();
@@ -17,5 +28,5 @@ export async function generateSummary(plaintext: string): Promise<string> {
   if (block.type !== "text") {
     throw new Error("Unexpected response type from AI");
   }
-  return block.text;
+  return removeInitialMarkdownHeading(block.text);
 }
