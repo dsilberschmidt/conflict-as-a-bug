@@ -107,7 +107,7 @@ function ContributionCard({ contribution }: { contribution: Contribution }) {
         <div className="flex items-center gap-3">
           <p className="text-xs text-stone-400">{formattedDate}</p>
           {contribution.seekingBackers ? (
-            <span className="text-xs font-medium text-amber-700">seeks backing</span>
+            <span className="text-xs font-medium text-amber-700">backing requested</span>
           ) : null}
         </div>
         <p className="text-base leading-7 text-stone-900">{contribution.text}</p>

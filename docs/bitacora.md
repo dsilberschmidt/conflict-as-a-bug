@@ -351,3 +351,27 @@
   muestra `Sign consent` para el segundo clic que abre la firma. Sin sesión se
   mantienen `Open to solvers` o `Consent to open`, y no hay reanudación
   automática.
+
+# 11 de septiembre de 2026 — smoke final de Preview
+
+- La CLI aprobó 3/3 tests y generó un caso nuevo correctamente. El enlace abrió
+  directamente en "Mutual understanding confirmed"; Firefox actuó como B y
+  Brave como A. Tras login, ambos CTA cambiaron a `Sign consent` y ambas firmas
+  funcionaron. `Opening…` tuvo latencia perceptible, pero terminó creando el
+  caso, generando un resumen limpio de un único párrafo sin heading Markdown y
+  redirigiendo al showcase.
+- Al enviar la primera contribución con `This could use backing`, aparecieron la
+  contribución y el flujo Audit/backing, mientras desapareció `Share your
+  perspective`. Confirma el límite de una única solución visible de esta PoC,
+  aunque el backend conserva su soporte múltiple. La etiqueta estable pasa de
+  `seeks backing` a `backing requested`: expresa que la propuesta solicitó apoyo
+  y no contradice la tarjeta `Funded`, cuyo estado sólo vive en el cliente y no
+  persiste al recargar.
+- El reintento automático no eliminó la intermitencia de backing. En este smoke,
+  el primer clic agotó los dos intentos `estimateGas` separados por 2 segundos y
+  mostró el error controlado. Un segundo clic manual sí permitió aprobar y
+  confirmar la transferencia Sepolia
+  `0x3db9e3cb85d7a6c4508a797be1732b1c8b6c93ff2ea7fbf6356db62e05eaed69`.
+  `sendWithEstimateGasRetry` es una mitigación acotada y segura: sólo reintenta
+  el fallo pre-broadcast exacto, evita duplicados y mejora el error, pero no
+  resuelve la causa de la intermitencia.

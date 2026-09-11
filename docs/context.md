@@ -221,7 +221,10 @@ documentada en el código; el mecanismo real de selección de destinatario vive 
 El backend mantiene soporte para múltiples contribuciones, pero esta PoC sólo
 deja visible el formulario mientras no exista ninguna: después de la primera
 se conserva su tarjeta en `/showcase/[caseId]` y se oculta el formulario para
-no añadir otra solución durante la demo.
+no añadir otra solución durante la demo. Cuando la propuesta solicita apoyo, la
+etiqueta estable de la tarjeta es `backing requested`: describe la solicitud y
+no contradice `Funded`, cuyo estado hoy vive sólo en el cliente y no persiste al
+recargar.
 
 Si al menos una contribución tiene `seekingBackers: true` y el caso tiene
 `recipientAddress`, `showcase/[caseId]/page.tsx` renderiza `BackerFlow`
@@ -262,12 +265,27 @@ elimina por sí solo la intermitencia: el primer backing falló antes de broadca
 con `CALL_EXCEPTION` y `action="estimateGas"`, y el segundo clic sí envió la
 transacción Sepolia
 `0xb1f70f6e148df8e3bd0bd0b646b47b9fa90271a094573291c86bf89fa8cdaf27`.
-`send-with-estimate-gas-retry.ts` resuelve sólo ese caso con un reintento interno
+`send-with-estimate-gas-retry.ts` mitiga sólo ese caso con un reintento interno
 tras una pausa breve de 2 segundos y acotado a dos intentos. Sólo reintenta
 exactamente ese error previo a que `sendTransaction` devuelva una transacción;
 no reintenta errores de otra clase ni errores posteriores al broadcast, de modo
 que no puede duplicar una transferencia. Si se agotan ambos intentos, conserva
-un error controlado.
+un error controlado; no elimina la intermitencia observada.
+
+El smoke final de Preview confirmó la CLI (3/3 tests) y un caso nuevo: el enlace
+abrió directamente en "Mutual understanding confirmed", Firefox actuó como B y
+Brave como A. Tras login, ambos CTA cambiaron a `Sign consent`, ambas firmas
+funcionaron y `Opening…` tardó perceptiblemente, pero finalmente creó el caso,
+generó un único párrafo limpio sin heading Markdown y redirigió al showcase. La
+primera contribución marcada `This could use backing` mostró la contribución y
+el flujo Audit/backing mientras desaparecía `Share your perspective`, confirmando
+el límite de una solución visible de esta PoC.
+
+En ese smoke, el primer clic de backing agotó los dos intentos `estimateGas`
+separados por 2 segundos y mostró el error controlado; un segundo clic manual
+permitió aprobar y confirmar la transferencia Sepolia
+`0x3db9e3cb85d7a6c4508a797be1732b1c8b6c93ff2ea7fbf6356db62e05eaed69`.
+El workaround vigente es volver a pulsar `Fund this project` tras el error.
 
 Verificado end-to-end en producción el 9 de septiembre de 2026: caso nuevo creado vía
 `/invite` con dos wallets Privy distintas, contribución con `seekingBackers`, Audit,

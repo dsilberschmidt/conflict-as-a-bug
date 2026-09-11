@@ -26,12 +26,14 @@ producción y ampliaciones de producto siguen pendientes.
   Chainlink. Si el proyecto tiene uso externo real, dos mejoras baratas quedan
   pendientes: paginación con cursor, o separar/filtrar casos de prueba de casos reales
   en la vista pública.
-- Intermitencia de "Fund this project": durante las pruebas del 9-10 de septiembre
-  se observó un fallo puntual de "missing revert data (action=estimateGas…)" pese a
-  que `switchChain(11155111)` ya estaba aplicado y la wallet tenía balance suficiente;
-  reintentar la misma acción funcionó sin cambios. Causa no identificada — posible RPC
-  lento o timing de `switchChain`. Anotado como posible intermitencia a vigilar,
-  especialmente relevante si se graba una demo en vivo.
+- Investigar la intermitencia prolongada de `estimateGas` en `Fund this project`:
+  incluso con `switchChain`, faucet confirmado y el reintento interno seguro de
+  dos intentos separados por 2 segundos, ambos intentos pueden fallar antes de
+  broadcast. El workaround actual es pulsar otra vez `Fund this project` tras el
+  error controlado. Falta identificar si la causa es RPC, wallet o timing de red.
+- Reducir la latencia perceptible de `Opening…` durante la creación del caso,
+  sin ocultar el estado de progreso ni alterar las firmas, la creación ni la
+  generación del resumen.
 
 ## Hardening contractual posterior a la PoC
 
