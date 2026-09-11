@@ -296,3 +296,58 @@
 - Antes del merge: impedir títulos Markdown en el generador directo, validar la
   respuesta del faucet y esperar/reintentar de forma controlada hasta que el RPC
   vea el saldo; luego ejecutar tests, build y una prueba corta de Preview.
+
+# 11 de septiembre de 2026 — generador de Preview y hardening de resumen/faucet
+
+- `daa8104` reforzó el prompt del generador directo para devolver sólo un
+  párrafo, sin título, heading, label, Markdown, listas ni texto introductorio.
+  Añadió una limpieza conservadora que elimina exclusivamente un heading
+  Markdown inicial inequívoco, separado por una línea en blanco y con contenido
+  posterior; no descarta otros textos.
+- Se añadió `web/src/lib/faucet/client.ts`: valida la respuesta HTTP de
+  `/api/faucet`, convierte los fallos en errores controlados y, cuando recibe un
+  `txHash` válido, hace que el `BrowserProvider` creado tras `switchChain` vea
+  una confirmación antes del backing. La espera está acotada a 60 segundos;
+  timeout o receipt ausente no dejan la UI indefinidamente en "Sending…".
+- Daniel confirmó ocho tests específicos aprobados (tres del resumen y cinco
+  del cliente de faucet), además de lint y build. El aviso local de
+  `useWallets` es esperable cuando falta `NEXT_PUBLIC_PRIVY_APP_ID`; no indica
+  un fallo del flujo provisionado en Preview.
+- Se añadió la CLI de desarrollo `web/scripts/generate-confirmed-invitation.mjs`
+  y el comando `npm run generate:confirmed-invite -- <base-url>`. Construye con
+  las transiciones reales de `crypto.ts` dos perspectivas y dos paráfrasis
+  aceptadas, cifra el estado y escribe sólo un enlace `/invite` que abre en
+  "Mutual understanding confirmed". Genera un `caseId` nuevo en cada uso y no
+  añade consentimientos ni `openEnvelope`, por lo que Privy, resumen y
+  faucet/backing siguen siendo reales. No escribe Upstash ni agrega rutas o
+  accesos de prueba a la aplicación.
+- Hallazgo UX documentado, sin cambio de producto: tras login de Privy hay que
+  pulsar otra vez el CTA para firmar. Queda pendiente un botón explícito `Sign
+  consent`; esta tanda se concentra en el generador.
+
+# 11 de septiembre de 2026 — smoke de Preview y reintento pre-broadcast
+
+- El smoke de Preview aprobó los 3/3 tests de la CLI y confirmó que el enlace
+  generado abre directamente en "Mutual understanding confirmed". B y luego A
+  firmaron, el caso se creó, el resumen directo fue un único párrafo limpio sin
+  heading Markdown y la redirección al showcase fue correcta.
+- El backing volvió a fallar en el primer clic con `missing revert data`
+  (`action="estimateGas"`, `code=CALL_EXCEPTION`) pese a que el faucet y cliente
+  ya esperan la confirmación. El segundo clic funcionó y produjo la transacción
+  Sepolia `0xb1f70f6e148df8e3bd0bd0b646b47b9fa90271a094573291c86bf89fa8cdaf27`.
+  Por tanto, esperar sólo el receipt era insuficiente: el fallo sucede antes
+  del broadcast.
+- Se añadió `send-with-estimate-gas-retry.ts`, con un único reintento interno
+  tras una pausa breve de 2 segundos para exactamente `CALL_EXCEPTION` +
+  `action === "estimateGas"`. No reintenta
+  otra clase de error ni una operación que ya devolvió transacción; tras dos
+  fallos muestra un error controlado. Sus tests cubren éxito tras un fallo
+  inicial con una única transacción, agotamiento y propagación inmediata de un
+  error no reintentable.
+- En la PoC, `/showcase/[caseId]` conserva la primera contribución visible y
+  oculta el formulario para añadir otra. El backend conserva el soporte de
+  múltiples contribuciones para una ampliación futura.
+- Se cerró el pendiente UX de etiqueta: después del primer login, `/invite`
+  muestra `Sign consent` para el segundo clic que abre la firma. Sin sesión se
+  mantienen `Open to solvers` o `Consent to open`, y no hay reanudación
+  automática.

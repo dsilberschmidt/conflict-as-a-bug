@@ -11,7 +11,8 @@
     "test:cases": "node --test src/lib/cases/store.test.mjs",
     "test:chain-sync": "node --test src/lib/chain/sync.test.mjs",
     "test:privy-server": "node --test src/lib/privy/server.test.mjs",
-    "test:faucet": "node --test src/lib/faucet/funder.test.mjs"
+    "test:faucet": "node --test src/lib/faucet/funder.test.mjs",
+    "generate:confirmed-invite": "node scripts/generate-confirmed-invitation.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

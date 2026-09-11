@@ -82,12 +82,14 @@ export default async function CaseDetailPage({
           </section>
         ) : null}
 
-        <section className="flex flex-col gap-4">
-          <h2 className="text-base font-semibold text-stone-900">
-            Share your perspective
-          </h2>
-          <ContributionForm caseId={caseId} isOpen={record.status === "opened"} />
-        </section>
+        {contributions.length === 0 ? (
+          <section className="flex flex-col gap-4">
+            <h2 className="text-base font-semibold text-stone-900">
+              Share your perspective
+            </h2>
+            <ContributionForm caseId={caseId} isOpen={record.status === "opened"} />
+          </section>
+        ) : null}
       </div>
     </main>
   );

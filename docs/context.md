@@ -144,9 +144,41 @@ guarda el resultado con `caseStore.setSummary`. Es idempotente: si el caso ya
 tiene summary lo devuelve directamente sin volver a llamar a la IA, evitando
 abuso dado que los caseId son públicos.
 
+Desde `daa8104`, el prompt del generador directo exige únicamente un párrafo
+neutral, sin título, heading, label, Markdown, lista ni texto introductorio.
+Como defensa determinística adicional, sólo se elimina un heading Markdown
+inicial si está inequívocamente separado por una línea en blanco y le sigue
+contenido; cualquier otro texto se conserva para no arriesgar contenido.
+
+## Utilidad de desarrollo: enlace con comprensión mutua
+
+`web/scripts/generate-confirmed-invitation.mjs` evita manualmente el recorrido
+previo de perspectivas y paráfrasis para preparar una prueba de Preview. Usa
+las funciones reales de `web/src/lib/invitations/crypto.ts` para crear un
+`caseId` aleatorio, añadir dos perspectivas, aceptar ambas paráfrasis, cifrar
+el estado y construir el enlace `/invite` con `createInvitationLink`. Se usa
+desde `web/` exactamente así:
+
+```sh
+npm run generate:confirmed-invite -- https://conflict-as-a-bug.vercel.app
+```
+
+En una ejecución exitosa escribe únicamente el enlace utilizable por stdout.
+El estado abre directamente en "Mutual understanding confirmed", pero no trae
+`consents` ni `openEnvelope`: las dos firmas reales de Privy, la generación
+real del resumen y el test real de faucet/backing siguen siendo pasos
+pendientes. Es sólo una CLI de desarrollo: no escribe en Upstash, no llama a
+ninguna API y no añade rutas ni accesos de prueba a la aplicación.
+
+El smoke test de Preview confirmó los 3/3 tests de la CLI y el flujo completo
+desde uno de sus enlaces: B y después A firmaron, el caso se creó, el resumen
+directo apareció como un único párrafo limpio y la redirección fue correcta.
+La CLI sólo ahorra el recorrido previo; esas firmas y verificaciones siguen
+siendo reales en cada smoke test.
+
 Al alcanzar comprensión mutua, `/invite` abre el flujo de consentimiento. La primera persona cifra una vez y fija `openEnvelope`, firma exactamente `JSON.stringify(openEnvelope)`, añade el consentimiento y genera un enlace de transporte nuevo con la invitación actualizada. La segunda firma el mismo string; su dirección determina si es repetida o la segunda parte. Sólo con dos direcciones distintas se hace `POST /api/cases` y se redirige a `/showcase/[caseId]`.
 
-Privy autentica por email y firma desde la wallet embebida con `getEmbeddedConnectedWallet`, provider EIP-1193, `BrowserProvider` y `signer.signMessage(getBytes(messageHash))`. La UX es explícita en dos pasos: sin sesión, el primer clic abre `login()` y muestra `After signing in, select the button again to sign your consent.`; el segundo abre la firma. Reemplaza una reanudación automática que fallaba lint y prerender. Sin `NEXT_PUBLIC_PRIVY_APP_ID`, el fallback conserva el build; puede avisar `useWallets` fuera del provider, pero `/invite` prerenderiza.
+Privy autentica por email y firma desde la wallet embebida con `getEmbeddedConnectedWallet`, provider EIP-1193, `BrowserProvider` y `signer.signMessage(getBytes(messageHash))`. La UX sigue siendo explícitamente de dos pasos y sin reanudación automática: sin sesión conserva `Open to solvers` o `Consent to open`, el primer clic abre `login()` y, al volver autenticada, el CTA pasa inequívocamente a `Sign consent` para abrir la firma. Sin `NEXT_PUBLIC_PRIVY_APP_ID`, el fallback conserva el build; puede avisar `useWallets` fuera del provider, pero `/invite` prerenderiza.
 
 Cliente y contrato calculan primero `caseIdHash = keccak256(UTF-8(caseId))` y `stateHash = keccak256(UTF-8(JSON.stringify(openEnvelope)))`; después `messageHash = keccak256(abi.encodePacked(caseIdHash, stateHash))`. La wallet firma los 32 bytes de `messageHash` con EIP-191 y el contrato recupera esa firma al recibir ambos `bytes32`. La cadena recibe hash, firmas, direcciones y estado, nunca texto.
 
@@ -186,6 +218,11 @@ recibe y persiste el flag. `CaseRecord` añade `recipientAddress?: string`, pobl
 documentada en el código; el mecanismo real de selección de destinatario vive en
 `Backing.sol` (ver `future.md`).
 
+El backend mantiene soporte para múltiples contribuciones, pero esta PoC sólo
+deja visible el formulario mientras no exista ninguna: después de la primera
+se conserva su tarjeta en `/showcase/[caseId]` y se oculta el formulario para
+no añadir otra solución durante la demo.
+
 Si al menos una contribución tiene `seekingBackers: true` y el caso tiene
 `recipientAddress`, `showcase/[caseId]/page.tsx` renderiza `BackerFlow`
 (backer-flow.tsx), un client component con dos estados: primero una tarjeta con botón
@@ -212,6 +249,25 @@ falla con "missing revert data" incluso con la wallet fondeada. La secuencia cor
 documentan que `switchChain` no actualiza instancias de provider ya construidas. Si
 `switchChain` falla, el error se convierte en "Could not switch wallet to Sepolia: …"
 antes de mostrarse en pantalla.
+
+Desde `daa8104`, `web/src/lib/faucet/client.ts` valida la respuesta HTTP de
+`/api/faucet` y muestra un error controlado si falla. Si devuelve un `txHash`
+válido, tras el cambio a Sepolia el mismo `BrowserProvider` espera una
+confirmación de esa transacción durante como máximo 60 segundos antes de enviar
+los 0.001 ETH; un receipt ausente o timeout también se convierte en error
+controlado.
+
+El smoke de Preview posterior demostró que esperar el receipt del faucet no
+elimina por sí solo la intermitencia: el primer backing falló antes de broadcast
+con `CALL_EXCEPTION` y `action="estimateGas"`, y el segundo clic sí envió la
+transacción Sepolia
+`0xb1f70f6e148df8e3bd0bd0b646b47b9fa90271a094573291c86bf89fa8cdaf27`.
+`send-with-estimate-gas-retry.ts` resuelve sólo ese caso con un reintento interno
+tras una pausa breve de 2 segundos y acotado a dos intentos. Sólo reintenta
+exactamente ese error previo a que `sendTransaction` devuelva una transacción;
+no reintenta errores de otra clase ni errores posteriores al broadcast, de modo
+que no puede duplicar una transferencia. Si se agotan ambos intentos, conserva
+un error controlado.
 
 Verificado end-to-end en producción el 9 de septiembre de 2026: caso nuevo creado vía
 `/invite` con dos wallets Privy distintas, contribución con `seekingBackers`, Audit,
@@ -306,17 +362,20 @@ de backing, audit simulado y transferencia real en Sepolia. La transacción
 confirmada fue
 `0xda1bca95b24ca5fd0deee636ae2e26dc6b1a3b0354769e55c38efe3a6cab2190`.
 
-La generación de resumen en `web/` siguió usando el generador directo, no CRE,
-y devolvió un título Markdown antes del párrafo. El primer intento de
-financiación terminó en `estimateGas`; tras esperar y reintentar, la wallet
-permitió firmar y la transferencia pasó. Es compatible con un retraso de
-propagación del saldo, pero todavía no está demostrado. El cliente tampoco
-comprueba actualmente la respuesta HTTP de `/api/faucet`.
+`daa8104` corrigió los dos hallazgos de Preview sin integrar CRE en `web/`: el
+prompt directo ahora pide un único párrafo sin Markdown y el resultado elimina
+de forma conservadora un heading inicial inequívoco. El nuevo cliente del
+faucet valida la respuesta HTTP, espera en el provider recién creado una
+confirmación del `txHash` durante un máximo de 60 segundos antes del backing y
+presenta errores controlados. Daniel confirmó los ocho tests específicos (tres
+del resumen y cinco del cliente del faucet), lint y build. El aviso local de
+`useWallets` se explica por no disponer localmente de
+`NEXT_PUBLIC_PRIVY_APP_ID`, no por un fallo de la ruta de producción.
 
-Antes del merge quedan por impedir títulos Markdown en el generador directo,
-validar la respuesta del faucet y esperar/reintentar de forma controlada hasta
-que el RPC vea el saldo; después, ejecutar tests, build y una prueba corta de
-Preview.
+El pendiente UX de consentimiento quedó cerrado en la etiqueta: después de
+iniciar sesión con Privy, el CTA muestra inequívocamente `Sign consent`, sin
+reanudación automática; queda sólo el segundo clic intencional para abrir la
+firma.
 
 ## Límite actual
 
@@ -352,6 +411,10 @@ npm run test:cases        # 9/9 (store con fake in-memory, desde web/)
 npm run test:chain-sync   # 7/7 (helpers on-chain con fakes, desde web/)
 npm run test:privy-server # 6/6 (identidad Privy server-side con fakes, desde web/)
 npm run test:faucet       # 2/2 (guarda de fondeo con fakes, desde web/)
+node --test src/lib/ai/summarize.test.mjs # 3/3 (generador directo)
+node --test src/lib/faucet/client.test.mjs # 5/5 (cliente faucet y timeout)
+node --test src/lib/faucet/send-with-estimate-gas-retry.test.mjs # reintento pre-broadcast
+node --test scripts/generate-confirmed-invitation.test.mjs # CLI de desarrollo
 # desde contracts/:
 npm run test:offline      # 33/33 (solc local, sin red)
 # poblar vitrina (requiere Next.js corriendo o BASE_URL a producción):

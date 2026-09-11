@@ -122,7 +122,7 @@ export default function InvitationPage() {
   const [error, setError] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
   const router = useRouter();
-  const { signConsentMessage } = useConsentSigner();
+  const { authenticated, signConsentMessage } = useConsentSigner();
 
   useEffect(() => {
     let isCurrent = true;
@@ -724,9 +724,11 @@ export default function InvitationPage() {
                 >
                   {isCreating
                     ? "Opening…"
-                    : (invitation.invitation.consents?.length ?? 0) === 0
-                      ? "Open to solvers"
-                      : "Consent to open"}
+                    : authenticated
+                      ? "Sign consent"
+                      : (invitation.invitation.consents?.length ?? 0) === 0
+                        ? "Open to solvers"
+                        : "Consent to open"}
                 </button>
               )}
             </div>

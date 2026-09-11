@@ -40,6 +40,5 @@ export function useConsentSigner() {
     return { address: wallet.address, signature };
   }
 
-  return { signConsentMessage };
+  return { authenticated, signConsentMessage };
 }
-

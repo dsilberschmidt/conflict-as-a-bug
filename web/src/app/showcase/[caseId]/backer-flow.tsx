@@ -4,6 +4,7 @@ import { useState } from "react";
 import { BrowserProvider, parseEther } from "ethers";
 import { getEmbeddedConnectedWallet, usePrivy, useWallets } from "@privy-io/react-auth";
 import { requestFaucet, waitForFaucetTransaction } from "../../../lib/faucet/client";
+import { sendWithEstimateGasRetry } from "../../../lib/faucet/send-with-estimate-gas-retry";
 
 const TRANSFER_AMOUNT = parseEther("0.001");
 
@@ -67,10 +68,10 @@ export function BackerFlow({ recipientAddress }: { recipientAddress: string }) {
         await waitForFaucetTransaction(provider, faucetResult.txHash);
       }
       const signer = await provider.getSigner();
-      const tx = await signer.sendTransaction({
+      const tx = await sendWithEstimateGasRetry(() => signer.sendTransaction({
         to: recipientAddress,
         value: TRANSFER_AMOUNT,
-      });
+      }));
       await tx.wait();
       setTxHash(tx.hash);
       setPhase("done");
